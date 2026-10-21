@@ -95,6 +95,7 @@ data/models/*
 !data/reference_images/.gitkeep
 !data/calibration/.gitkeep
 !data/models/.gitkeep
+!data/test_images/harness_sample_01.jpeg*
 
 # Machine Learning model weights and serialized checkpoints
 *.pt
