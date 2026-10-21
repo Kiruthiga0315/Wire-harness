@@ -16,12 +16,14 @@ FRONTEND_ROOT = PROJECT_ROOT / "frontend"
 
 
 def resolve_backend_python() -> Path:
-    windows_venv = BACKEND_ROOT / ".venv" / "Scripts" / "python.exe"
-    unix_venv = BACKEND_ROOT / ".venv" / "bin" / "python"
-    if windows_venv.is_file():
-        return windows_venv
-    if unix_venv.is_file():
-        return unix_venv
+    if os.name == "nt":
+        windows_venv = BACKEND_ROOT / ".venv" / "Scripts" / "python.exe"
+        if windows_venv.is_file():
+            return windows_venv
+    else:
+        unix_venv = BACKEND_ROOT / ".venv" / "bin" / "python"
+        if unix_venv.is_file() and os.access(unix_venv, os.X_OK):
+            return unix_venv
     return Path(sys.executable)
 
 
