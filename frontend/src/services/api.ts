@@ -5,7 +5,7 @@ import type { MockInspectionResponse } from '../types/inspection'
 import type { ColorInspectionResponse } from '../types/colorInspection'
 import type { InspectionReportResponse } from '../types/report'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8000'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
 const DEMO_IMAGE_PATH = '/api/test-images/harness_sample_01.jpeg'
 
 export const DEMO_IMAGE_URL = `${API_BASE_URL}${DEMO_IMAGE_PATH}`
