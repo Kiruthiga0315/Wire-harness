@@ -1,0 +1,12 @@
+fastapi>=0.116,<1.0
+uvicorn[standard]>=0.35,<1.0
+pydantic>=2.11,<3.0
+SQLAlchemy>=2.0,<3.0
+psycopg[binary]>=3.2,<4.0
+python-dotenv>=1.1,<2.0
+numpy>=2.2,<3.0
+opencv-python-headless>=4.12,<5.0
+scikit-image>=0.25,<1.0
+
+# Future AI integration placeholder (not installed or used yet):
+# ultralytics>=8.3

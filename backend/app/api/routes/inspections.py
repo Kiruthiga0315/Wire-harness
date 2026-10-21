@@ -1,0 +1,60 @@
+import asyncio
+import logging
+
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.core.database import get_db
+from app.models import Checkpoint, ProductModel
+from app.schemas.inspection import MockInspectionRequest, MockInspectionResponse
+from app.services.mock_inspection_service import MockInspectionService
+
+router = APIRouter(prefix="/inspections", tags=["Inspections"])
+logger = logging.getLogger(__name__)
+mock_inspection_service = MockInspectionService()
+DEMO_PROCESSING_SECONDS = 2.0
+
+
+@router.post(
+    "/demo/process",
+    response_model=MockInspectionResponse,
+    summary="Run deterministic mock inspection",
+)
+async def process_demo_inspection(
+    payload: MockInspectionRequest,
+    db: Session = Depends(get_db),
+) -> MockInspectionResponse:
+    model = db.scalar(select(ProductModel).where(ProductModel.model_id == payload.model_id))
+    if model is None:
+        raise HTTPException(status_code=404, detail="Product model not found")
+
+    checkpoints = list(
+        db.scalars(
+            select(Checkpoint)
+            .where(
+                Checkpoint.model_id == payload.model_id,
+                Checkpoint.enabled.is_(True),
+                Checkpoint.checkpoint_id.like("CP-%"),
+            )
+            .order_by(Checkpoint.id)
+        )
+    )
+    if not checkpoints:
+        raise HTTPException(status_code=422, detail="No enabled checkpoints are configured")
+
+    logger.info("Mock inspection started | model=%s", payload.model_id)
+    await asyncio.sleep(DEMO_PROCESSING_SECONDS)
+    response = mock_inspection_service.evaluate(
+        model,
+        checkpoints,
+        cycle_time_seconds=DEMO_PROCESSING_SECONDS,
+    )
+    logger.info(
+        "Mock inspection completed | model=%s | result=%s | pass=%s | ng=%s",
+        payload.model_id,
+        response.state,
+        response.passed,
+        response.failed,
+    )
+    return response

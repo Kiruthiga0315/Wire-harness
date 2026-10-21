@@ -1,0 +1,131 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Python distribution / packaging
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.env/
+.venv/
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Unit test / coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.hypothesis/
+.mypy_cache/
+.ruff_cache/
+
+# Node / Frontend
+node_modules/
+dist/
+dist-ssr/
+*.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+*.tsbuildinfo
+.eslintcache
+
+# Environment variables & secrets
+.env
+.env.*
+!.env.example
+.streamlit/secrets.toml
+credentials*.json
+service-account*.json
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Logging
+logs/*
+!logs/.gitkeep
+*.log
+
+# Database files
+data/*.db
+data/*.sqlite
+data/*.sqlite3
+data/*.db-journal
+
+# Runtime data & captured artifacts
+data/captured_images/*
+data/inspection_results/*
+data/reports/*
+data/test_images/*
+data/reference_images/*
+data/calibration/*
+data/models/*
+
+# Retain directory structure with .gitkeep
+!data/captured_images/.gitkeep
+!data/inspection_results/.gitkeep
+!data/reports/.gitkeep
+!data/test_images/.gitkeep
+!data/reference_images/.gitkeep
+!data/calibration/.gitkeep
+!data/models/.gitkeep
+
+# Machine Learning model weights and serialized checkpoints
+*.pt
+*.pth
+*.onnx
+*.engine
+*.weights
+*.pb
+*.tflite
+*.mlmodel
+*.h5
+*.hdf5
+*.safetensors
+*.bin
+*.pkl
+*.pickle
+
+# Operating system & Editor files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+*.lnk
+
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+*.sublime-workspace
+*.sublime-project
