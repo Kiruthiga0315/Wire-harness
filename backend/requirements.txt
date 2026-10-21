@@ -7,6 +7,7 @@ python-dotenv>=1.1,<2.0
 numpy>=2.2,<3.0
 opencv-python-headless>=4.12,<5.0
 scikit-image>=0.25,<1.0
+Pillow>=10.4,<13.0
 
 # Future AI integration placeholder (not installed or used yet):
 # ultralytics>=8.3

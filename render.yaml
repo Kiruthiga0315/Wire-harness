@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: wire-harness-inspection-backend
+    runtime: python
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --app-dir backend
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: ENVIRONMENT
+        value: production
+      - key: AI_MODE
+        value: mock
+      - key: CAMERA_MODE
+        value: mock
+      - key: FRONTEND_URL
+        value: http://localhost:5173,http://127.0.0.1:5173
