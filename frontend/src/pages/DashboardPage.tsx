@@ -1,4 +1,5 @@
 import { Activity, CircleCheckBig, CircleX, Clock3, TriangleAlert } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { MetricCard } from '../components/MetricCard'
 import { PageHeader } from '../components/PageHeader'
 import { StatusPill } from '../components/StatusPill'
@@ -12,6 +13,7 @@ const recentInspections = [
 ]
 
 export function DashboardPage() {
+  const navigate = useNavigate()
   const { health, loading, error } = useSystemHealth()
 
   return (
@@ -58,7 +60,7 @@ export function DashboardPage() {
         </article>
 
         <article className="panel recent-panel">
-          <div className="panel-header"><div><p className="eyebrow">LATEST ACTIVITY</p><h2>Recent inspections</h2></div><button className="text-button">View history</button></div>
+          <div className="panel-header"><div><p className="eyebrow">LATEST ACTIVITY</p><h2>Recent inspections</h2></div><button className="text-button" onClick={() => navigate('/history')}>View history</button></div>
           <div className="table-wrap">
             <table>
               <thead><tr><th>Inspection ID</th><th>Model</th><th>Time</th><th>Cycle</th><th>Result</th></tr></thead>
