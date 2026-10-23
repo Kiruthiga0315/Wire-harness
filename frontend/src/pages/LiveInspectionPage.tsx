@@ -1,6 +1,7 @@
 import { FileImage, ImagePlus, Play, RotateCcw, ScanBarcode } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { ChangeEvent } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { HarnessBoard } from '../components/HarnessBoard'
 import { PageHeader } from '../components/PageHeader'
 import { StatusPill } from '../components/StatusPill'
@@ -33,6 +34,7 @@ function stateTone(state: InspectionState): 'pass' | 'ng' | 'warning' | 'info' {
 }
 
 export function LiveInspectionPage() {
+  const navigate = useNavigate()
   const inputRef = useRef<HTMLInputElement>(null)
   const objectUrlRef = useRef<string | null>(null)
   const [image, setImage] = useState<LoadedImage | null>(null)
@@ -180,7 +182,16 @@ export function LiveInspectionPage() {
             </div>
           )}
           <div className="inspection-controls">
-            <button className="button button--secondary" disabled={processing}><ScanBarcode size={19} />Model selected</button>
+            <button
+              type="button"
+              className="button button--secondary"
+              onClick={() => navigate('/models')}
+              disabled={processing}
+              title="Configure or switch active inspection recipe"
+            >
+              <ScanBarcode size={19} />
+              Model: {DEMO_MODEL_ID}
+            </button>
             <input ref={inputRef} className="visually-hidden" type="file" accept="image/jpeg,image/png" onChange={handleUpload} />
             <button className="button button--secondary" onClick={() => inputRef.current?.click()} disabled={imageLoading || processing}><ImagePlus size={19} />Upload test image</button>
             <button className="button button--secondary" onClick={handleLoadDemo} disabled={imageLoading || processing}><FileImage size={19} />{imageLoading ? 'Loading demo…' : 'Load demo image'}</button>
