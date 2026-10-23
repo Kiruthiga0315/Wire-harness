@@ -18,7 +18,7 @@ pipeline {
 
         stage('Verify Python') {
             steps {
-                bat 'python --version'
+                bat 'C:\Users\91979\AppData\Local\Microsoft\WindowsApps\python.exe'
             }
         }
 
