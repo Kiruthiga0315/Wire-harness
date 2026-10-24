@@ -1,7 +1,7 @@
 # AI Wire Harness Final Inspection System
 
 Phase 1 application foundation for a production-oriented automotive wire harness inspection HMI.
-This project is isolated from the existing PEOS application and can be run locally without Docker.
+This project is isolated from the existing PEOS application and can be run locally without Docker.###
 
 ## Streamlit cloud interface
 
