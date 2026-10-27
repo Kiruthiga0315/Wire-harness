@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import type { InspectionState, MockCheckpointResult, MockInspectionResponse } from '../types/inspection'
+import { ACTIVE_IMAGE_URL, getActiveImageMetadata, resetActiveImage, uploadActiveImage } from '../services/api'
 
 export interface LoadedImage {
   url: string
@@ -47,6 +48,25 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
   }, [])
 
   useEffect(() => {
+    getActiveImageMetadata()
+      .then((meta) => {
+        if (meta && meta.source === 'upload') {
+          setImage({
+            url: `${ACTIVE_IMAGE_URL}?t=${Date.now()}`,
+            name: meta.filename,
+            source: 'upload',
+            size: meta.size,
+            width: meta.width,
+            height: meta.height,
+          })
+        }
+      })
+      .catch(() => {
+        // Silently ignore initialization error
+      })
+  }, [])
+
+  useEffect(() => {
     return () => releaseObjectUrl()
   }, [releaseObjectUrl])
 
@@ -63,6 +83,22 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     setImage({ url, name, source, size: blob.size, width: null, height: null })
     setError(null)
     clearInspection()
+
+    if (source === 'upload') {
+      void uploadActiveImage(blob, name)
+        .then((meta) => {
+          setImage((current) =>
+            current && current.source === 'upload'
+              ? { ...current, width: meta.width, height: meta.height, size: meta.size }
+              : current
+          )
+        })
+        .catch((err) => {
+          setError(err instanceof Error ? err.message : 'Failed to sync image to backend.')
+        })
+    } else {
+      void resetActiveImage()
+    }
   }, [clearInspection, releaseObjectUrl])
 
   const handleReset = useCallback(() => {
@@ -71,6 +107,7 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     setError(null)
     setImageLoading(false)
     clearInspection()
+    void resetActiveImage()
   }, [clearInspection, releaseObjectUrl])
 
   const value: InspectionContextType = {

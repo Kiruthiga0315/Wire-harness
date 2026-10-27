@@ -9,6 +9,61 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
 const DEMO_IMAGE_PATH = '/api/test-images/harness_sample_01.jpeg'
 
 export const DEMO_IMAGE_URL = `${API_BASE_URL}${DEMO_IMAGE_PATH}`
+export const ACTIVE_IMAGE_URL = `${API_BASE_URL}/api/test-images/active`
+
+export interface ActiveImageMetadata {
+  filename: string
+  content_type: string
+  width: number
+  height: number
+  size: number
+  source: 'demo' | 'upload'
+}
+
+export async function uploadActiveImage(file: File | Blob, filename?: string): Promise<ActiveImageMetadata> {
+  try {
+    const formData = new FormData()
+    const name = filename || (file instanceof File ? file.name : 'upload.png')
+    formData.append('file', file, name)
+
+    const response = await fetch(`${API_BASE_URL}/api/test-images/active`, {
+      method: 'POST',
+      body: formData,
+    })
+    if (!response.ok) {
+      let message = 'Image upload failed.'
+      try {
+        const errorData = await response.json() as { detail?: string }
+        if (errorData.detail) message = errorData.detail
+      } catch {
+        // Fallback message
+      }
+      throw new ApiError(message, response.status)
+    }
+    return (await response.json()) as ActiveImageMetadata
+  } catch (error) {
+    if (error instanceof ApiError) throw error
+    throw new ApiError('Failed to upload test image to inspection server.')
+  }
+}
+
+export async function resetActiveImage(): Promise<void> {
+  try {
+    await fetch(`${API_BASE_URL}/api/test-images/active`, { method: 'DELETE' })
+  } catch {
+    // Graceful fallback
+  }
+}
+
+export async function getActiveImageMetadata(signal?: AbortSignal): Promise<ActiveImageMetadata | null> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/test-images/active/metadata`, { signal })
+    if (!response.ok) return null
+    return (await response.json()) as ActiveImageMetadata
+  } catch {
+    return null
+  }
+}
 
 export class ApiError extends Error {
   constructor(message: string, public readonly status?: number) {

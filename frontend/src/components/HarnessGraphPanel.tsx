@@ -1,5 +1,6 @@
 import { CircleDot, GitBranch, Network, Play, Ruler, TriangleAlert } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useInspection } from '../context/InspectionContext'
 import { runHarnessGraphAnalysis } from '../services/api'
 import type { HarnessGraphResponse } from '../types/engineering'
 import { StatusPill } from './StatusPill'
@@ -8,9 +9,15 @@ const px = (value: number) => `${value.toFixed(1)} px`
 const degrees = (value: number) => `${value.toFixed(1)}°`
 
 export function HarnessGraphPanel() {
+  const { image } = useInspection()
   const [result, setResult] = useState<HarnessGraphResponse | null>(null)
   const [processing, setProcessing] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    setResult(null)
+    setError(null)
+  }, [image?.name, image?.url])
 
   const analyseGraph = async () => {
     setProcessing(true)

@@ -33,9 +33,10 @@ from app.schemas.harness_graph import (
     HarnessGraphResponse,
     JunctionTerminalDistanceResponse,
 )
-from app.services.harness_segmentation_service import HarnessSegmentationService, ImageArray
-from app.services.harness_graph_service import HarnessGraphService
+from app.services.active_image_service import active_image_service
 from app.services.color_inspection_service import ColorInspectionService
+from app.services.harness_graph_service import HarnessGraphService
+from app.services.harness_segmentation_service import HarnessSegmentationService, ImageArray
 
 router = APIRouter(prefix="/engineering", tags=["Engineering"])
 segmentation_service = HarnessSegmentationService()
@@ -57,20 +58,14 @@ def _png_data_url(image: ImageArray) -> str:
     summary="Run experimental segmentation on the configured harness image",
 )
 def segment_demo_image() -> SegmentationResponse:
-    image_path = resolve_demo_image()
-    if image_path is None:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Demo image is missing from data/test_images/{DEMO_IMAGE_LOGICAL_NAME}",
-        )
-
+    active = active_image_service.get_active_image()
     try:
-        result = segmentation_service.segment_file(image_path)
+        result = segmentation_service.segment(active.bgr_image)
     except (ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=422, detail=f"Segmentation failed: {exc}") from exc
 
     return SegmentationResponse(
-        source_image=f"data/test_images/{DEMO_IMAGE_LOGICAL_NAME}",
+        source_image=active.filename,
         method="OpenCV grayscale + inverted Otsu threshold + morphological closing + connected-component filtering",
         production_ready=False,
         disclaimer=(
@@ -114,15 +109,8 @@ def inspect_checkpoint_colour(
     if not checkpoint.expected_value:
         raise HTTPException(status_code=422, detail="Checkpoint has no expected colour")
 
-    image_path = resolve_demo_image()
-    if image_path is None:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Demo image is missing from data/test_images/{DEMO_IMAGE_LOGICAL_NAME}",
-        )
-    image = cv2.imread(str(image_path), cv2.IMREAD_COLOR)
-    if image is None:
-        raise HTTPException(status_code=422, detail="The demo image could not be decoded")
+    active = active_image_service.get_active_image()
+    image = active.bgr_image
 
     try:
         result = color_inspection_service.inspect(
@@ -174,15 +162,8 @@ def inspect_checkpoint_colour(
     summary="Analyse experimental skeleton endpoints and junctions",
 )
 def analyse_demo_harness_graph() -> HarnessGraphResponse:
-    image_path = resolve_demo_image()
-    if image_path is None:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Demo image is missing from data/test_images/{DEMO_IMAGE_LOGICAL_NAME}",
-        )
-    image = cv2.imread(str(image_path), cv2.IMREAD_COLOR)
-    if image is None:
-        raise HTTPException(status_code=422, detail="The demo image could not be decoded")
+    active = active_image_service.get_active_image()
+    image = active.bgr_image
 
     try:
         segmentation = segmentation_service.segment(image)
@@ -194,7 +175,7 @@ def analyse_demo_harness_graph() -> HarnessGraphResponse:
         raise HTTPException(status_code=422, detail=f"Harness graph analysis failed: {exc}") from exc
 
     return HarnessGraphResponse(
-        source_image=f"data/test_images/{DEMO_IMAGE_LOGICAL_NAME}",
+        source_image=active.filename,
         production_ready=False,
         disclaimer=(
             "Feasibility analysis only. Endpoint, junction, branch, orientation, and pixel-distance "

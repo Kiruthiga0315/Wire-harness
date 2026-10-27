@@ -2,6 +2,7 @@ import { Download, FileText, Printer, RefreshCw, Search, TriangleAlert } from 'l
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { PageHeader } from '../components/PageHeader'
 import { StatusPill } from '../components/StatusPill'
+import { useInspection } from '../context/InspectionContext'
 import { downloadDemoReportCsv, getDemoReport } from '../services/api'
 import type { InspectionReportResponse } from '../types/report'
 
@@ -11,6 +12,7 @@ const px = (value: number) => `${value.toFixed(1)} px`
 const degrees = (value: number) => `${value.toFixed(1)}°`
 
 export function ReportsPage() {
+  const { image } = useInspection()
   const [report, setReport] = useState<InspectionReportResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [exporting, setExporting] = useState(false)
@@ -35,7 +37,7 @@ export function ReportsPage() {
     const controller = new AbortController()
     void loadReport(controller.signal)
     return () => controller.abort()
-  }, [loadReport])
+  }, [loadReport, image?.name, image?.url])
 
   const filteredCheckpoints = useMemo(() => {
     if (!report) return []

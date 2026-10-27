@@ -14,6 +14,7 @@ from app.api.routes.images import DEMO_IMAGE_LOGICAL_NAME, resolve_demo_image
 from app.core.database import get_db
 from app.models import Checkpoint, ProductModel
 from app.schemas.report import InspectionReportResponse, ReportBranchMeasurement
+from app.services.active_image_service import active_image_service
 from app.services.harness_segmentation_service import ImageArray
 from app.services.reporting_service import InspectionReportResult, ReportingService
 
@@ -46,15 +47,8 @@ def _generate_demo_report(db: Session) -> tuple[ProductModel, InspectionReportRe
     if not checkpoints:
         raise HTTPException(status_code=422, detail="No enabled demo checkpoints are configured")
 
-    image_path = resolve_demo_image()
-    if image_path is None:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Demo image is missing from data/test_images/{DEMO_IMAGE_LOGICAL_NAME}",
-        )
-    image = cv2.imread(str(image_path), cv2.IMREAD_COLOR)
-    if image is None:
-        raise HTTPException(status_code=422, detail="The demo image could not be decoded")
+    active = active_image_service.get_active_image()
+    image = active.bgr_image
     try:
         return model, reporting_service.generate(model, checkpoints, image)
     except (ValueError, RuntimeError) as exc:
@@ -68,6 +62,7 @@ def _generate_demo_report(db: Session) -> tuple[ProductModel, InspectionReportRe
 )
 def get_demo_report(db: Session = Depends(get_db)) -> InspectionReportResponse:
     model, report = _generate_demo_report(db)
+    active = active_image_service.get_active_image()
     graph = report.graph
     inspection = report.inspection
     return InspectionReportResponse(
@@ -80,7 +75,7 @@ def get_demo_report(db: Session = Depends(get_db)) -> InspectionReportResponse:
         work_order="WO-DEMO-001",
         barcode="DEMO-WH-001",
         operator="Development",
-        source_image=f"data/test_images/{DEMO_IMAGE_LOGICAL_NAME}",
+        source_image=active.filename,
         overall_result=inspection.state,
         total_checkpoints=inspection.total_checkpoints,
         passed=inspection.passed,

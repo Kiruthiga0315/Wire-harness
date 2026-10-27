@@ -1,5 +1,6 @@
 import { Droplets, RefreshCw, ScanSearch } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useInspection } from '../context/InspectionContext'
 import { getCheckpoints, runColorInspection } from '../services/api'
 import type { EngineeringCheckpoint } from '../types/checkpoint'
 import type { ColorInspectionResponse } from '../types/colorInspection'
@@ -9,6 +10,7 @@ const MODEL_ID = 'DEMO-HARNESS-001'
 const supportedColours = new Set(['BLACK', 'WHITE', 'BLUE', 'RED', 'GREEN', 'YELLOW', 'ORANGE', 'GREY', 'GRAY'])
 
 export function ColorInspectionPanel() {
+  const { image } = useInspection()
   const [checkpoints, setCheckpoints] = useState<EngineeringCheckpoint[]>([])
   const [selectedId, setSelectedId] = useState('')
   const [debug, setDebug] = useState(false)
@@ -16,6 +18,11 @@ export function ColorInspectionPanel() {
   const [loadingCheckpoints, setLoadingCheckpoints] = useState(true)
   const [processing, setProcessing] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    setResult(null)
+    setError(null)
+  }, [image?.name, image?.url])
 
   const loadColourCheckpoints = useCallback(async () => {
     setLoadingCheckpoints(true)

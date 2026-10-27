@@ -38,10 +38,10 @@ export function EngineeringViewPage() {
     const controller = new AbortController()
     void processImage(controller.signal)
     return () => controller.abort()
-  }, [processImage])
+  }, [processImage, image?.name, image?.url])
 
-  const imageWidth = result?.metrics.image_width ?? 681
-  const imageHeight = result?.metrics.image_height ?? 1584
+  const imageWidth = image?.width ?? result?.metrics.image_width ?? 681
+  const imageHeight = image?.height ?? result?.metrics.image_height ?? 1584
 
   return (
     <>
@@ -58,7 +58,11 @@ export function EngineeringViewPage() {
         <StatusPill tone="warning">ENGINEERING ONLY</StatusPill>
       </div>
 
-      <EngineeringCheckpointEditor imageWidth={imageWidth} imageHeight={imageHeight} />
+      <EngineeringCheckpointEditor
+        imageWidth={imageWidth}
+        imageHeight={imageHeight}
+        imageUrl={image?.url}
+      />
 
       <ColorInspectionPanel />
 

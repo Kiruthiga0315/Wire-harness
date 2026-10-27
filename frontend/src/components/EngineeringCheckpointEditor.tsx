@@ -12,6 +12,7 @@ const inspectionTypes = ['Presence', 'Position', 'Orientation', 'Type', 'Colour'
 interface EngineeringCheckpointEditorProps {
   imageWidth: number
   imageHeight: number
+  imageUrl?: string
 }
 
 interface EditorDraft extends CheckpointPayload {
@@ -33,7 +34,7 @@ function newDraft(x: number, y: number, sequence: number): EditorDraft {
   }
 }
 
-export function EngineeringCheckpointEditor({ imageWidth, imageHeight }: EngineeringCheckpointEditorProps) {
+export function EngineeringCheckpointEditor({ imageWidth, imageHeight, imageUrl }: EngineeringCheckpointEditorProps) {
   const [checkpoints, setCheckpoints] = useState<EngineeringCheckpoint[]>([])
   const [draft, setDraft] = useState<EditorDraft | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -141,7 +142,7 @@ export function EngineeringCheckpointEditor({ imageWidth, imageHeight }: Enginee
             role="application"
             aria-label="Click the harness image to add an engineering checkpoint"
           >
-            <img src={DEMO_IMAGE_URL} alt="Harness sample for checkpoint placement" draggable={false} />
+            <img src={imageUrl || DEMO_IMAGE_URL} alt="Harness sample for checkpoint placement" draggable={false} />
             {displayCheckpoints.map((checkpoint) => (
               <Fragment key={checkpoint.checkpoint_id}>
                 <span
