@@ -72,7 +72,7 @@ def get_active_image() -> Response:
         headers={
             "Cache-Control": "no-store",
             "X-Image-Source": record.source,
-            "X-Image-Filename": record.filename,
+            "X-Image-Filename": record.filename.encode("ascii", "replace").decode("ascii"),
         },
     )
 

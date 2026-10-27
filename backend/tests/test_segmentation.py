@@ -46,3 +46,26 @@ def test_demo_segmentation_api_returns_renderable_images() -> None:
     assert payload["images"]["binary_mask"].startswith("data:image/png;base64,")
     assert payload["images"]["contour_image"].startswith("data:image/png;base64,")
     assert payload["images"]["skeleton_image"].startswith("data:image/png;base64,")
+
+
+def test_segmentation_service_preserves_edge_touching_workpiece() -> None:
+    # Image where a major workpiece touches the left edge (x=0)
+    # and spans across >30% width and >30% height, alongside a peripheral artifact on top edge.
+    image = np.full((300, 300, 3), 255, dtype=np.uint8)
+
+    # Main harness spanning across width and height, touching edge at x=0
+    cv2.line(image, (0, 150), (200, 150), (0, 0, 0), 16)
+    cv2.line(image, (200, 150), (200, 260), (0, 0, 0), 16)
+
+    # Peripheral artifact: narrow strip on top border
+    cv2.rectangle(image, (50, 0), (250, 2), (0, 0, 0), -1)
+
+    result = HarnessSegmentationService().segment(image)
+
+    # The spanning workpiece touching the edge must be preserved
+    assert result.contour_count >= 1
+    assert result.occupied_percentage > 2.0
+    # The peripheral strip at the top border should be excluded
+    assert result.excluded_border_component_count == 1
+    assert cv2.countNonZero(result.skeleton_image) > 50
+

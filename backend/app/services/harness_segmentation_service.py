@@ -132,16 +132,45 @@ class HarnessSegmentationService:
 
     @staticmethod
     def _remove_border_components(mask: ImageArray) -> tuple[ImageArray, int]:
-        """Reject threshold regions connected to the frame edge as capture artifacts."""
-        component_count, labels = cv2.connectedComponents(mask, connectivity=8)
+        """Reject peripheral border capture artifacts while preserving spanning workpieces."""
+        component_count, labels, statistics, centroids = cv2.connectedComponentsWithStats(
+            mask,
+            connectivity=8,
+        )
         if component_count <= 1:
             return mask.copy(), 0
+
+        height, width = mask.shape[:2]
+        total_pixels = float(height * width)
 
         border_labels = np.unique(
             np.concatenate((labels[0, :], labels[-1, :], labels[:, 0], labels[:, -1]))
         )
         border_labels = border_labels[border_labels != 0]
+
         cleaned = mask.copy()
+        excluded_count = 0
+
         for label in border_labels:
+            area = float(statistics[label, cv2.CC_STAT_AREA])
+            comp_w = float(statistics[label, cv2.CC_STAT_WIDTH])
+            comp_h = float(statistics[label, cv2.CC_STAT_HEIGHT])
+            cx, cy = centroids[label]
+
+            # A genuine harness workpiece that touches or reaches near the edge
+            # spans a large fraction of the frame and has its center of mass inside.
+            is_spanning_workpiece = (
+                (comp_w >= 0.30 * width and comp_h >= 0.30 * height)
+                or (area >= 0.04 * total_pixels)
+            )
+            is_central = (0.08 * width <= cx <= 0.92 * width) and (
+                0.08 * height <= cy <= 0.92 * height
+            )
+
+            if is_spanning_workpiece and is_central:
+                continue
+
             cleaned[labels == label] = 0
-        return cleaned, int(border_labels.size)
+            excluded_count += 1
+
+        return cleaned, excluded_count
