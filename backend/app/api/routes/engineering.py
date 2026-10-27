@@ -7,7 +7,6 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.routes.images import DEMO_IMAGE_LOGICAL_NAME, resolve_demo_image
 from app.core.database import get_db
 from app.models import Checkpoint
 from app.schemas.color_inspection import (
@@ -33,7 +32,11 @@ from app.schemas.harness_graph import (
     HarnessGraphResponse,
     JunctionTerminalDistanceResponse,
 )
-from app.services.active_image_service import active_image_service
+from app.services.active_image_service import (
+    DEMO_IMAGE_LOGICAL_NAME,
+    active_image_service,
+    resolve_demo_image,
+)
 from app.services.color_inspection_service import ColorInspectionService
 from app.services.harness_graph_service import HarnessGraphService
 from app.services.harness_segmentation_service import HarnessSegmentationService, ImageArray

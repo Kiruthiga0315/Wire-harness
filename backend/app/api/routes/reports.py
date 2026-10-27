@@ -10,11 +10,14 @@ from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.routes.images import DEMO_IMAGE_LOGICAL_NAME, resolve_demo_image
 from app.core.database import get_db
 from app.models import Checkpoint, ProductModel
 from app.schemas.report import InspectionReportResponse, ReportBranchMeasurement
-from app.services.active_image_service import active_image_service
+from app.services.active_image_service import (
+    DEMO_IMAGE_LOGICAL_NAME,
+    active_image_service,
+    resolve_demo_image,
+)
 from app.services.harness_segmentation_service import ImageArray
 from app.services.reporting_service import InspectionReportResult, ReportingService
 

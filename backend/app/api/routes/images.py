@@ -3,24 +3,15 @@ from pathlib import Path
 from fastapi import APIRouter, File, HTTPException, Response, UploadFile
 from fastapi.responses import FileResponse
 
-from app.core.settings import get_settings
+from app.services.active_image_service import (
+    DEMO_IMAGE_CANDIDATES,
+    DEMO_IMAGE_LOGICAL_NAME,
+    active_image_service,
+    resolve_demo_image,
+)
+from app.services.cloud_io import UploadedImageValidationError
 
 router = APIRouter(prefix="/test-images", tags=["Test Images"])
-
-DEMO_IMAGE_LOGICAL_NAME = "harness_sample_01.jpeg"
-DEMO_IMAGE_CANDIDATES = (
-    DEMO_IMAGE_LOGICAL_NAME,
-    f"{DEMO_IMAGE_LOGICAL_NAME}.jpeg",
-)
-
-
-def resolve_demo_image() -> Path | None:
-    test_image_directory = get_settings().project_root / "data" / "test_images"
-    for filename in DEMO_IMAGE_CANDIDATES:
-        candidate = test_image_directory / filename
-        if candidate.is_file():
-            return candidate
-    return None
 
 
 @router.post(
@@ -28,9 +19,6 @@ def resolve_demo_image() -> Path | None:
     summary="Upload and set the active inspection image across operations",
 )
 async def upload_active_image(file: UploadFile = File(...)) -> dict[str, object]:
-    from app.services.active_image_service import active_image_service
-    from app.services.cloud_io import UploadedImageValidationError
-
     payload = await file.read()
     try:
         record = active_image_service.set_uploaded_image(
@@ -59,8 +47,6 @@ async def upload_active_image(file: UploadFile = File(...)) -> dict[str, object]
     summary="Retrieve the current active inspection image",
 )
 def get_active_image() -> Response:
-    from app.services.active_image_service import active_image_service
-
     try:
         record = active_image_service.get_active_image()
     except Exception as exc:
@@ -82,8 +68,6 @@ def get_active_image() -> Response:
     summary="Retrieve metadata of the current active inspection image",
 )
 def get_active_image_metadata() -> dict[str, object]:
-    from app.services.active_image_service import active_image_service
-
     try:
         record = active_image_service.get_active_image()
     except Exception as exc:
@@ -104,8 +88,6 @@ def get_active_image_metadata() -> dict[str, object]:
     summary="Reset active inspection image back to the demo image",
 )
 def reset_active_image() -> dict[str, object]:
-    from app.services.active_image_service import active_image_service
-
     record = active_image_service.reset_to_demo()
     return {
         "status": "reset",

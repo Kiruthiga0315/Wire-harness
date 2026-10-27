@@ -8,11 +8,26 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from app.api.routes.images import DEMO_IMAGE_LOGICAL_NAME, resolve_demo_image
+from app.core.settings import get_settings
 from app.services.cloud_io import decode_uploaded_image
 from app.services.harness_segmentation_service import ImageArray
 
 logger = logging.getLogger(__name__)
+
+DEMO_IMAGE_LOGICAL_NAME = "harness_sample_01.jpeg"
+DEMO_IMAGE_CANDIDATES = (
+    DEMO_IMAGE_LOGICAL_NAME,
+    f"{DEMO_IMAGE_LOGICAL_NAME}.jpeg",
+)
+
+
+def resolve_demo_image() -> Path | None:
+    test_image_directory = get_settings().project_root / "data" / "test_images"
+    for filename in DEMO_IMAGE_CANDIDATES:
+        candidate = test_image_directory / filename
+        if candidate.is_file():
+            return candidate
+    return None
 
 
 @dataclass(frozen=True, slots=True)
