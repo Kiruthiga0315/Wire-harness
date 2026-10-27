@@ -48,8 +48,9 @@ export function LiveInspectionPage() {
   const handleUpload = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
-    if (!file.type.startsWith('image/')) {
-      setError('Select a JPEG or PNG image file.')
+    const isImage = file.type.startsWith('image/') || /\.(jpe?g|png|bmp)$/i.test(file.name)
+    if (!isImage) {
+      setError('Select a JPEG, PNG, or BMP image file.')
       event.target.value = ''
       return
     }
@@ -103,7 +104,7 @@ export function LiveInspectionPage() {
 
   const handleImageError = () => {
     resetContext()
-    setError('The selected image could not be decoded. Choose a valid JPEG or PNG file.')
+    setError('The selected image could not be decoded. Choose a valid JPEG, PNG, or BMP file.')
     setInspectionState('ERROR')
   }
 
@@ -164,7 +165,7 @@ export function LiveInspectionPage() {
               <ScanBarcode size={19} />
               Model: {DEMO_MODEL_ID}
             </button>
-            <input ref={inputRef} className="visually-hidden" type="file" accept="image/jpeg,image/png" onChange={handleUpload} />
+            <input ref={inputRef} className="visually-hidden" type="file" accept="image/jpeg,image/png,image/bmp,.bmp,.jpg,.jpeg,.png" onChange={handleUpload} />
             <button className="button button--secondary" onClick={() => inputRef.current?.click()} disabled={imageLoading || processing}><ImagePlus size={19} />Upload test image</button>
             <button className="button button--secondary" onClick={handleLoadDemo} disabled={imageLoading || processing}><FileImage size={19} />{imageLoading ? 'Loading demo…' : 'Load demo image'}</button>
             <button className="button button--primary" onClick={() => void handleStartInspection()} disabled={!image || imageLoading || processing}><Play size={19} />{processing ? 'Processing…' : 'Start inspection'}</button>

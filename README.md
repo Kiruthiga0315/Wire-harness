@@ -29,7 +29,7 @@ Included:
 - React, TypeScript, Vite, and React Router frontend.
 - Responsive industrial dashboard, navigation, and system status.
 - Live Inspection, Models / Recipes, Cameras, and complete demonstration Reports screens.
-- Local test-image upload and backend-served demo-image loading on Live Inspection.
+- Local test-image upload (JPEG, PNG, and BMP) and backend-served demo-image loading on Live Inspection.
 - Experimental OpenCV harness segmentation with binary mask, contours, skeleton, and occupancy metrics.
 - Persistent Engineering Checkpoint Editor for model `DEMO-HARNESS-001`.
 - Deterministic 12-checkpoint Live Inspection demo using `MockInspectionService`.

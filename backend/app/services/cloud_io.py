@@ -15,8 +15,8 @@ from app.services.inspection_engine import InspectionResult
 MAX_UPLOAD_BYTES = 15 * 1024 * 1024
 MAX_IMAGE_DIMENSION = 12_000
 MAX_IMAGE_PIXELS = 40_000_000
-SUPPORTED_SUFFIXES = {".jpg", ".jpeg", ".png"}
-SUPPORTED_MIME_TYPES = {"image/jpeg", "image/png"}
+SUPPORTED_SUFFIXES = {".jpg", ".jpeg", ".png", ".bmp"}
+SUPPORTED_MIME_TYPES = {"image/jpeg", "image/png", "image/bmp", "image/x-ms-bmp"}
 Image.MAX_IMAGE_PIXELS = MAX_IMAGE_PIXELS
 
 
@@ -33,7 +33,7 @@ def decode_uploaded_image(
     max_dimension: int = MAX_IMAGE_DIMENSION,
     max_pixels: int = MAX_IMAGE_PIXELS,
 ) -> ImageArray:
-    """Validate and decode a JPEG/PNG upload into an OpenCV BGR image."""
+    """Validate and decode a JPEG/PNG/BMP upload into an OpenCV BGR image."""
     if not payload:
         raise UploadedImageValidationError("The uploaded file is empty")
     if len(payload) > max_bytes:
@@ -42,24 +42,34 @@ def decode_uploaded_image(
         )
     suffix = Path(filename).suffix.lower()
     if suffix not in SUPPORTED_SUFFIXES:
-        raise UploadedImageValidationError("Only JPG, JPEG, and PNG files are supported")
+        raise UploadedImageValidationError("Only JPG, JPEG, PNG, and BMP files are supported")
     if content_type and content_type.lower() not in SUPPORTED_MIME_TYPES:
-        raise UploadedImageValidationError("The uploaded MIME type is not JPEG or PNG")
+        raise UploadedImageValidationError("The uploaded MIME type is not JPEG, PNG, or BMP")
 
     try:
         with Image.open(io.BytesIO(payload)) as probe:
             image_format = (probe.format or "").upper()
             width, height = probe.size
-            if image_format not in {"JPEG", "PNG"}:
-                raise UploadedImageValidationError("The decoded image is not JPEG or PNG")
-            expected_format = "PNG" if suffix == ".png" else "JPEG"
+            if image_format not in {"JPEG", "PNG", "BMP"}:
+                raise UploadedImageValidationError("The decoded image is not JPEG, PNG, or BMP")
+            if suffix == ".png":
+                expected_format = "PNG"
+            elif suffix == ".bmp":
+                expected_format = "BMP"
+            else:
+                expected_format = "JPEG"
             if image_format != expected_format:
                 raise UploadedImageValidationError(
                     "The file extension does not match the decoded image format"
                 )
             if content_type:
-                expected_mime = "image/png" if image_format == "PNG" else "image/jpeg"
-                if content_type.lower() != expected_mime:
+                if image_format == "PNG":
+                    valid_mimes = {"image/png"}
+                elif image_format == "BMP":
+                    valid_mimes = {"image/bmp", "image/x-ms-bmp"}
+                else:
+                    valid_mimes = {"image/jpeg"}
+                if content_type.lower() not in valid_mimes:
                     raise UploadedImageValidationError(
                         "The uploaded MIME type does not match the decoded image format"
                     )
