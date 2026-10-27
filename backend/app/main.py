@@ -1,7 +1,15 @@
 from __future__ import annotations
 
 import logging
+import sys
 from contextlib import asynccontextmanager
+from pathlib import Path
+
+# Ensure the backend directory is in sys.path so 'import app...' works
+# whether started from backend/, the repository root, or cloud hosts like Render.
+_backend_root = Path(__file__).resolve().parent.parent
+if str(_backend_root) not in sys.path:
+    sys.path.insert(0, str(_backend_root))
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware

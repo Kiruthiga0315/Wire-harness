@@ -85,13 +85,15 @@ docker compose up --build -d
 
 ### Option B: Cloud Hosting (Render / Railway / VPS)
 
-#### 1. Backend Web Service
+#### 1. Backend Web Service (Render / Railway / Cloud)
+- **Root Directory**: (Leave blank / repository root)
 - **Build Command**: `pip install -r requirements.txt`
-- **Start Command**: `uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT`
+- **Start Command**: `uvicorn main:app --host 0.0.0.0 --port $PORT` (or `uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT`)
 - **Environment Variables**:
-  - `PORT`: Configured by host (default 8000)
+  - `PORT`: Configured automatically by host
+  - `ENVIRONMENT`: `production`
+  - `FRONTEND_URL`: `https://wire-harness-rho.vercel.app`
   - `DATABASE_URL`: `sqlite:///data/inspection.db` (or `postgresql+psycopg://user:pass@host:5432/db`)
-  - `CORS_ORIGINS`: Origin URL of the deployed frontend (e.g. `https://my-hmi.vercel.app`)
 
 #### 2. Frontend Static Site (Vercel / Netlify / Cloudflare Pages)
 - **Framework Preset**: Vite
