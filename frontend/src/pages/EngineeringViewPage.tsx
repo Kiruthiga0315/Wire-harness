@@ -5,6 +5,7 @@ import { ColorInspectionPanel } from '../components/ColorInspectionPanel'
 import { HarnessGraphPanel } from '../components/HarnessGraphPanel'
 import { PageHeader } from '../components/PageHeader'
 import { StatusPill } from '../components/StatusPill'
+import { useInspection } from '../context/InspectionContext'
 import { runDemoSegmentation } from '../services/api'
 import type { SegmentationResponse } from '../types/engineering'
 
@@ -15,6 +16,7 @@ const resultPanels = [
 ] as const
 
 export function EngineeringViewPage() {
+  const { image } = useInspection()
   const [result, setResult] = useState<SegmentationResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -60,7 +62,7 @@ export function EngineeringViewPage() {
 
       <ColorInspectionPanel />
 
-      <div className="engineering-section-title"><div><p className="eyebrow">SEGMENTATION DIAGNOSTICS</p><h2>Image-processing outputs</h2></div><span>Input: harness_sample_01.jpeg</span></div>
+      <div className="engineering-section-title"><div><p className="eyebrow">SEGMENTATION DIAGNOSTICS</p><h2>Image-processing outputs</h2></div><span>Input: {image ? `${image.name} (${image.source === 'upload' ? 'Local upload' : 'Demo'})` : 'harness_sample_01.jpeg'}</span></div>
 
       {error && <div className="alert-banner" role="alert"><TriangleAlert size={20} /><div><strong>Segmentation unavailable</strong><span>{error}</span></div></div>}
 

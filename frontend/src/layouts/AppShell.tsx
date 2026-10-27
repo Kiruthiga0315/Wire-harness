@@ -18,6 +18,7 @@ import {
 import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { StatusPill } from '../components/StatusPill'
+import { useInspection } from '../context/InspectionContext'
 import { useSystemHealth } from '../hooks/useSystemHealth'
 
 const navigation = [
@@ -36,6 +37,7 @@ const navigation = [
 
 export function AppShell() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const { image } = useInspection()
   const { health, loading, error } = useSystemHealth()
   const systemOnline = health?.status === 'healthy'
 
@@ -64,6 +66,15 @@ export function AppShell() {
             </NavLink>
           ))}
         </nav>
+        {image && (
+          <div className="sidebar-footer" style={{ borderTop: '1px solid rgba(255,255,255,0.08)', marginBottom: 0 }}>
+            <span className="sidebar-footer-label">ACTIVE TEST IMAGE</span>
+            <div style={{ padding: '4px 0' }}>
+              <strong style={{ display: 'block', fontSize: '0.82rem', color: '#ffffff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={image.name}>{image.name}</strong>
+              <small style={{ color: image.source === 'upload' ? '#56b6ec' : '#35ca7a', fontWeight: 600 }}>{image.source === 'upload' ? 'LOCAL UPLOAD' : 'DEMO SAMPLE'} · SYNCED</small>
+            </div>
+          </div>
+        )}
         <div className="sidebar-footer">
           <span className="sidebar-footer-label">SYSTEM CONNECTION</span>
           <div className="connection-state">

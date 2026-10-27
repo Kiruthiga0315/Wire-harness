@@ -1,5 +1,7 @@
 # Cloud readiness audit
 
+> **Status Note (2026-10-27)**: The Streamlit prototype has been retired from this codebase. The stack is solely React 19 (frontend) + FastAPI (backend) + Swagger OpenAPI docs. This document is retained for historical capability reference.
+
 Audit date: 2026-10-16  
 Project: AI Wire Harness Final Inspection System
 

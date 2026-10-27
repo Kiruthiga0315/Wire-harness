@@ -1,126 +1,135 @@
-# Streamlit deployment guide
+# Deployment Guide
 
-This guide deploys the additive Streamlit interface. The existing FastAPI/React application remains
-available through `run.cmd` and is not required by the Streamlit process.
+This guide details deployment and operational procedures for the AI Wire Harness Final Inspection System. The stack consists of:
+- **Backend**: FastAPI (Python 3.11+) with Uvicorn, SQLite/PostgreSQL, and OpenCV image processing pipelines.
+- **Frontend**: Single-page application built with React 19, TypeScript, and Vite.
+- **API Documentation**: Interactive Swagger UI (`/docs`) and ReDoc (`/redoc`) served directly by FastAPI.
 
-## Current capability boundary
+---
 
-The repository contains real OpenCV segmentation, skeleton, topology, orientation, and pixel-distance
-algorithms. It does **not** contain trained YOLO/ONNX weights, an object-detector loader, a class map,
-validated component rules, reference routing data, or pixel-to-physical calibration. The Streamlit app
-therefore runs the implemented engineering pipeline and truthfully reports production rules as
-`NOT_EVALUATED`. It never substitutes the deterministic mock service for inference.
+## Architecture Overview
 
-The acceptance criterion requiring real trained-model detections cannot be completed until the owner
-supplies an authorized model and its matching validated preprocessing, loader, post-processing, class map,
-thresholds, and inspection-rule configuration.
-
-## Supported runtime
-
-- Python 3.12 (deployment target)
-- CPU execution
-- Linux-compatible `opencv-python-headless`
-- No camera, database, Node.js, CUDA, or writable persistent storage required for upload mode
-
-## Local execution on Windows
-
-Open PowerShell in the project folder:
-
-```powershell
-cd C:\Users\91979\OneDrive\PEOS\wire-harness-ai-inspection
-py -3.12 -m venv .venv-cloud
-.\.venv-cloud\Scripts\python.exe -m pip install --upgrade pip
-.\.venv-cloud\Scripts\python.exe -m pip install -r requirements-dev.txt
-.\.venv-cloud\Scripts\python.exe -m pytest tests
-.\.venv-cloud\Scripts\python.exe -m streamlit run streamlit_app.py
+```text
++-----------------------------+
+|    React 19 Frontend        |
+|    (Vite / Static Host)     |
++--------------+--------------+
+               | HTTP / REST API
+               v
++-----------------------------+
+|    FastAPI Backend          | <---> Swagger UI (/docs)
+|    (Uvicorn ASGI Server)    | <---> ReDoc (/redoc)
++--------------+--------------+
+               |
+        +------+------+
+        |             |
+        v             v
+   SQLite / PG     OpenCV Engine
+   Database        (Vision & Topology)
 ```
 
-Open the local URL printed by Streamlit, normally `http://localhost:8501`.
+---
 
-After setup, the single-command launcher is:
+## Local Development & Operations
 
-```powershell
-.\run_streamlit.cmd
+### 1. Unified Launcher
+Start both the backend and frontend together using `run.py`:
+
+```bash
+python run.py
 ```
-
-The machine-specific shortcut **AI Wire Harness Inspection** is generated beside the launcher and can be
-copied to the Windows Desktop. It is intentionally excluded from Git because it contains a local path.
-
-The original local application still starts separately with:
-
+Or on Windows:
 ```powershell
 .\run.cmd
 ```
 
-## Create a private GitHub repository
+- **Frontend**: http://127.0.0.1:5173
+- **Backend**: http://127.0.0.1:8000
+- **Swagger Documentation**: http://127.0.0.1:8000/docs
+- **Health Check**: http://127.0.0.1:8000/api/health
 
-Before committing, verify that `git status` does not list customer images, model weights, databases,
-credentials, `.env`, Streamlit secrets, or generated reports. The repository `.gitignore` excludes those
-categories by default, including `data/test_images/` and `data/models/`.
+### 2. Independent Services
 
-Using GitHub CLI:
-
-```powershell
-git init
-git add .
-git status
-git commit -m "Add cloud-safe Streamlit inspection interface"
-gh auth login
-gh repo create wire-harness-ai-inspection --private --source . --remote origin --push
+#### Backend Service
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-Alternatively, create a **private** empty repository in GitHub, then follow GitHub's displayed commands to
-add the remote and push. Do not override the ignore rules to commit confidential data or unauthorized
-weights.
+#### Frontend Service
+```bash
+cd frontend
+npm install
+npm run dev -- --host 0.0.0.0 --port 5173
+```
 
-## Deploy on Streamlit Community Cloud
+---
 
-1. Sign in to Streamlit Community Cloud using the GitHub account that can access the private repository.
-2. Choose **Create app** and select the private repository and branch.
-3. Set the main file path to `streamlit_app.py`.
-4. In advanced settings, select Python 3.12.
-5. No secrets are required for the current OpenCV-only app.
-6. Deploy, open the app URL, upload a non-confidential JPEG/PNG test image, and verify the downloadable
-   PNG, JSON, and CSV outputs.
+## Production Deployment
 
-Community Cloud installs root `requirements.txt` automatically. `.streamlit/config.toml` provides the
-headless server configuration and a 15 MB upload limit.
+### Option A: Containerized Deployment (Docker / Docker Compose)
 
-## Configuration and secrets
+The repository provides a `docker-compose.yml` for multi-service environments.
 
-Current deployment requires no environment variable, API key, database URL, or secret.
+1. **Build and Run**:
+```bash
+docker compose up --build -d
+```
+2. **Access**:
+- Frontend HMI: `http://<host>:5173` (or port `80` if mapped to reverse proxy)
+- Backend API: `http://<host>:8000`
+- Swagger UI: `http://<host>:8000/docs`
 
-`MODEL_WEIGHTS_PATH` is reserved for future integration. Setting it today only reports that the file is
-unsupported; inference remains disabled until a validated adapter exists. Never place private URLs or
-credentials in source code. If future model storage needs credentials, configure them through Streamlit
-secrets and load them at runtime without logging their values.
+### Option B: Cloud Hosting (Render / Railway / VPS)
 
-For a future large authorized model, use private object storage or a private model registry with:
+#### 1. Backend Web Service
+- **Build Command**: `pip install -r requirements.txt`
+- **Start Command**: `uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT`
+- **Environment Variables**:
+  - `PORT`: Configured by host (default 8000)
+  - `DATABASE_URL`: `sqlite:///data/inspection.db` (or `postgresql+psycopg://user:pass@host:5432/db`)
+  - `CORS_ORIGINS`: Origin URL of the deployed frontend (e.g. `https://my-hmi.vercel.app`)
 
-- short-lived or least-privilege read credentials;
-- a pinned object version and cryptographic checksum;
-- download size/time limits and a cache scoped to the Streamlit worker;
-- an explicit failure state when the download or checksum validation fails.
+#### 2. Frontend Static Site (Vercel / Netlify / Cloudflare Pages)
+- **Framework Preset**: Vite
+- **Root Directory**: `frontend`
+- **Build Command**: `npm run build`
+- **Output Directory**: `dist`
+- **Environment Variables**:
+  - `VITE_API_URL`: URL of the deployed backend (e.g. `https://api.yourdomain.com`)
 
-## CPU hosting limitations
+---
 
-Community Cloud is CPU-oriented. OpenCV segmentation and skeletonization scale with image size, so the app
-limits uploads to 15 MB, 12,000 pixels per side, and 40 megapixels. Large images may still process slowly or
-hit platform memory/time limits. A future detector must use bounded input size, batch size, confidence/NMS
-settings, and CPU-safe device selection supported by its real API.
+## Verification & Health Monitoring
 
-Streamlit sessions share cached read-only engine resources, while uploads and results stay in each user's
-session memory. No upload or temporary file is written by the Streamlit path.
+1. **Backend Health Check**:
+   ```bash
+   curl -s http://127.0.0.1:8000/api/health
+   ```
+   Expected response:
+   ```json
+   {
+     "status": "healthy",
+     "service": "wire-harness-inspection-api",
+     "database": "connected",
+     "version": "0.1.0"
+   }
+   ```
 
-## Post-deployment verification
+2. **OpenAPI Schema Check**:
+   ```bash
+   curl -s http://127.0.0.1:8000/openapi.json | head -n 10
+   ```
 
-- App opens without a model or camera.
-- JPEG/JPG/PNG validation rejects mismatched, corrupt, oversized, or over-dimensioned uploads.
-- Inspection runs only after the user presses **Run AI Inspection**.
-- Original input pixels are not modified.
-- Engineering measurements remain in pixels.
-- Unavailable component and dimensional rules show `NOT_EVALUATED`.
-- Annotated PNG, JSON, and CSV downloads open correctly.
-- Repeated runs receive unique inspection IDs and do not accumulate temporary files.
+3. **Automated Test Suite**:
+   ```bash
+   python -m pytest
+   ```
 
-See `docs/cloud-readiness-audit.md` for the full architecture and capability audit.
+4. **Frontend Production Build**:
+   ```bash
+   npm --prefix frontend run build
+   ```

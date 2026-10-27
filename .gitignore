@@ -59,7 +59,6 @@ lerna-debug.log*
 .env
 .env.*
 !.env.example
-.streamlit/secrets.toml
 credentials*.json
 service-account*.json
 *.pem

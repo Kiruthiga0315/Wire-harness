@@ -3,33 +3,19 @@
 Phase 1 application foundation for a production-oriented automotive wire harness inspection HMI.
 This project is isolated from the existing PEOS application and can be run locally without Docker.###
 
-## Streamlit cloud interface
+## Application Stack
 
-The repository now also has an additive, cloud-safe Streamlit entry point at `streamlit_app.py`. It accepts
-JPG/JPEG/PNG uploads in memory, runs the implemented OpenCV segmentation and harness-graph pipeline on
-demand, shows original and annotated evidence, and exports annotated PNG, JSON, and CSV results.
+The application runs as a clean, two-process architecture:
+- **React Frontend**: Industrial inspection HMI built with React 19, TypeScript, and Vite (`http://127.0.0.1:5173`).
+- **FastAPI Backend**: Python inspection API and engineering algorithms (`http://127.0.0.1:8000`).
+- **Interactive OpenAPI / Swagger Docs**: Complete interactive API documentation and schema playground at (`http://127.0.0.1:8000/docs`).
 
-No trained detector weights or validated YOLO/ONNX adapter exist in this repository. Accordingly, the cloud
-interface does not call `MockInspectionService`, does not invent detections, and does not issue a production
-PASS/FAIL. Component, routing, tape, connector, terminal, and physical-dimension rules remain
-`NOT_EVALUATED`; segmentation and topology are marked `REVIEW_REQUIRED` engineering evidence. Pixel
-measurements are explicitly uncalibrated.
-
-Run the cloud interface on Windows after installing its root requirements:
-
+Start both services simultaneously with a single command:
 ```powershell
-cd C:\Users\91979\OneDrive\PEOS\wire-harness-ai-inspection
-py -3.12 -m venv .venv-cloud
-.\.venv-cloud\Scripts\python.exe -m pip install -r requirements-dev.txt
-.\.venv-cloud\Scripts\python.exe -m streamlit run streamlit_app.py
+python run.py
+# or on Windows:
+.\run.cmd
 ```
-
-After the one-time installation, `run_streamlit.cmd` starts this Streamlit interface with one click.
-
-See [DEPLOYMENT.md](DEPLOYMENT.md) for private GitHub and Streamlit Community Cloud instructions, and
-[docs/cloud-readiness-audit.md](docs/cloud-readiness-audit.md) for the pre-change architecture/model audit.
-Exact runtime versions, test results, and unverified items are recorded in
-[docs/cloud-verification-report.md](docs/cloud-verification-report.md).
 
 ## Phase 1 status
 
@@ -201,9 +187,7 @@ wire-harness-ai-inspection/
 │   └── reports/
 ├── tests/
 │   ├── test_cloud_io.py
-│   ├── test_inspection_engine.py
-│   └── test_streamlit_startup.py
-├── streamlit_app.py
+│   └── test_inspection_engine.py
 ├── requirements.txt
 ├── requirements-dev.txt
 ├── DEPLOYMENT.md
@@ -294,25 +278,22 @@ Docker is optional. The included Compose file starts PostgreSQL only when its ex
 
 ## Verification
 
-For the Streamlit cloud path, from the project root:
-
-```powershell
-.\.venv-cloud\Scripts\python.exe -m pytest tests
-```
-
-For the original application, from `backend` with the virtual environment active:
+Run all automated Python tests across root and backend suites:
 
 ```powershell
 python -m pytest
 ```
 
-From `frontend`:
+Verify the frontend build and TypeScript types:
 
 ```powershell
-npm run build
+npm --prefix frontend run build
 ```
 
-The backend test confirms the API and SQLite connection. The frontend build performs strict TypeScript compilation and a production Vite build.
+Verify backend health and OpenAPI docs:
+- Health check: `http://127.0.0.1:8000/api/health`
+- Swagger UI: `http://127.0.0.1:8000/docs`
+- ReDoc UI: `http://127.0.0.1:8000/redoc`
 
 ## Live Inspection test image
 
@@ -323,5 +304,4 @@ data/test_images/harness_sample_01.jpeg
 ```
 
 The development image currently present on disk has an additional `.jpeg` suffix. The backend resolves
-that filename as a fallback while keeping the original file untouched. **Upload Test Image** creates a
-temporary browser preview only; it does not copy, upload, or overwrite the selected local file.
+that filename as a fallback while keeping the original file untouched. When an image is uploaded in **Live Inspection**, it seamlessly syncs across all views (Live Inspection, Engineering View, and Reports) through the shared application inspection context.

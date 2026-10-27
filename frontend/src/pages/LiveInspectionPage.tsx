@@ -1,24 +1,16 @@
 import { FileImage, ImagePlus, Play, RotateCcw, ScanBarcode } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useRef } from 'react'
 import type { ChangeEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { HarnessBoard } from '../components/HarnessBoard'
 import { PageHeader } from '../components/PageHeader'
 import { StatusPill } from '../components/StatusPill'
+import { useInspection } from '../context/InspectionContext'
 import { loadDemoImage, runMockInspection } from '../services/api'
-import type { InspectionState, MockCheckpointResult, MockInspectionResponse } from '../types/inspection'
+import type { InspectionState, MockCheckpointResult } from '../types/inspection'
 
 const MAX_UPLOAD_BYTES = 15 * 1024 * 1024
 const DEMO_MODEL_ID = 'DEMO-HARNESS-001'
-
-interface LoadedImage {
-  url: string
-  name: string
-  source: 'demo' | 'upload'
-  size: number
-  width: number | null
-  height: number | null
-}
 
 function formatFileSize(bytes: number): string {
   return bytes >= 1024 * 1024
@@ -36,37 +28,22 @@ function stateTone(state: InspectionState): 'pass' | 'ng' | 'warning' | 'info' {
 export function LiveInspectionPage() {
   const navigate = useNavigate()
   const inputRef = useRef<HTMLInputElement>(null)
-  const objectUrlRef = useRef<string | null>(null)
-  const [image, setImage] = useState<LoadedImage | null>(null)
-  const [imageLoading, setImageLoading] = useState(false)
-  const [inspectionState, setInspectionState] = useState<InspectionState>('READY')
-  const [inspection, setInspection] = useState<MockInspectionResponse | null>(null)
-  const [selectedResult, setSelectedResult] = useState<MockCheckpointResult | null>(null)
-  const [error, setError] = useState<string | null>(null)
-
-  const releaseObjectUrl = () => {
-    if (objectUrlRef.current) {
-      URL.revokeObjectURL(objectUrlRef.current)
-      objectUrlRef.current = null
-    }
-  }
-
-  useEffect(() => () => releaseObjectUrl(), [])
-
-  const clearInspection = () => {
-    setInspection(null)
-    setSelectedResult(null)
-    setInspectionState('READY')
-  }
-
-  const setImageBlob = (blob: Blob, name: string, source: LoadedImage['source']) => {
-    releaseObjectUrl()
-    const url = URL.createObjectURL(blob)
-    objectUrlRef.current = url
-    setImage({ url, name, source, size: blob.size, width: null, height: null })
-    setError(null)
-    clearInspection()
-  }
+  const {
+    image,
+    setImage,
+    setImageBlob,
+    imageLoading,
+    setImageLoading,
+    inspectionState,
+    setInspectionState,
+    inspection,
+    setInspection,
+    selectedResult,
+    setSelectedResult,
+    error,
+    setError,
+    handleReset: resetContext,
+  } = useInspection()
 
   const handleUpload = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -120,18 +97,13 @@ export function LiveInspectionPage() {
   }
 
   const handleReset = () => {
-    releaseObjectUrl()
-    setImage(null)
-    setError(null)
-    setImageLoading(false)
-    clearInspection()
+    resetContext()
     if (inputRef.current) inputRef.current.value = ''
   }
 
   const handleImageError = () => {
+    resetContext()
     setError('The selected image could not be decoded. Choose a valid JPEG or PNG file.')
-    releaseObjectUrl()
-    setImage(null)
     setInspectionState('ERROR')
   }
 
