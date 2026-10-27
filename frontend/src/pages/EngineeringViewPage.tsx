@@ -1,13 +1,16 @@
-import { Beaker, Binary, Boxes, Network, RefreshCw, TriangleAlert } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { Beaker, Binary, Boxes, FileImage, ImagePlus, Network, RefreshCw, TriangleAlert } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import type { ChangeEvent } from 'react'
 import { EngineeringCheckpointEditor } from '../components/EngineeringCheckpointEditor'
 import { ColorInspectionPanel } from '../components/ColorInspectionPanel'
 import { HarnessGraphPanel } from '../components/HarnessGraphPanel'
 import { PageHeader } from '../components/PageHeader'
 import { StatusPill } from '../components/StatusPill'
 import { useInspection } from '../context/InspectionContext'
-import { runDemoSegmentation } from '../services/api'
+import { ACTIVE_IMAGE_URL, loadDemoImage, runDemoSegmentation } from '../services/api'
 import type { SegmentationResponse } from '../types/engineering'
+
+const MAX_UPLOAD_BYTES = 15 * 1024 * 1024
 
 const resultPanels = [
   { key: 'binary_mask', title: 'Binary mask', description: 'Cleaned dark-object segmentation', icon: Binary },
@@ -16,32 +19,63 @@ const resultPanels = [
 ] as const
 
 export function EngineeringViewPage() {
-  const { image } = useInspection()
+  const { image, activeVersion, syncingActiveImage, uploadActiveImageFile, setImageBlob } = useInspection()
   const [result, setResult] = useState<SegmentationResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const processImage = useCallback(async (signal?: AbortSignal) => {
     setLoading(true)
     setError(null)
     try {
-      setResult(await runDemoSegmentation(signal))
+      const response = await runDemoSegmentation(signal)
+      setResult(response)
     } catch (processingError) {
       if (processingError instanceof DOMException && processingError.name === 'AbortError') return
       setError(processingError instanceof Error ? processingError.message : 'Segmentation failed.')
     } finally {
-      if (!signal?.aborted) setLoading(false)
+      setLoading(false)
     }
   }, [])
 
   useEffect(() => {
+    if (syncingActiveImage) return
     const controller = new AbortController()
     void processImage(controller.signal)
     return () => controller.abort()
-  }, [processImage, image?.name, image?.url])
+  }, [processImage, activeVersion, syncingActiveImage])
+
+  const handleUpload = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    const isImage = file.type.startsWith('image/') || /\.(jpe?g|png|bmp)$/i.test(file.name)
+    if (!isImage) {
+      setError('Select a JPEG, PNG, or BMP image file.')
+      event.target.value = ''
+      return
+    }
+    if (file.size > MAX_UPLOAD_BYTES) {
+      setError('The test image must be 15 MB or smaller.')
+      event.target.value = ''
+      return
+    }
+    void uploadActiveImageFile(file)
+    event.target.value = ''
+  }
+
+  const handleLoadDemo = async () => {
+    try {
+      const blob = await loadDemoImage()
+      await setImageBlob(blob, 'data/test_images/harness_sample_01.jpeg', 'demo')
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : 'Unable to load the demo image.')
+    }
+  }
 
   const imageWidth = image?.width ?? result?.metrics.image_width ?? 681
   const imageHeight = image?.height ?? result?.metrics.image_height ?? 1584
+  const activeWorkpieceUrl = image?.url || `${ACTIVE_IMAGE_URL}?v=${activeVersion}`
 
   return (
     <>
@@ -49,7 +83,43 @@ export function EngineeringViewPage() {
         eyebrow="VISION ENGINEERING"
         title="Engineering View"
         description="Configure pixel checkpoints and inspect intermediate computer-vision outputs."
-        actions={<button className="button button--primary" onClick={() => void processImage()} disabled={loading}><RefreshCw size={18} className={loading ? 'spin' : ''} />{loading ? 'Processing…' : 'Run segmentation'}</button>}
+        actions={
+          <div className="button-group">
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="visually-hidden"
+              accept="image/jpeg,image/png,image/bmp,.bmp,.jpg,.jpeg,.png"
+              onChange={handleUpload}
+            />
+            <button
+              className="button button--secondary"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={loading || syncingActiveImage}
+              title="Upload any JPEG, PNG, or BMP wire harness image"
+            >
+              <ImagePlus size={18} />
+              {syncingActiveImage ? 'Syncing image…' : 'Upload test image'}
+            </button>
+            <button
+              className="button button--secondary"
+              onClick={() => void handleLoadDemo()}
+              disabled={loading || syncingActiveImage}
+              title="Reset workpiece to standard demo harness"
+            >
+              <FileImage size={18} />
+              Load demo image
+            </button>
+            <button
+              className="button button--primary"
+              onClick={() => void processImage()}
+              disabled={loading || syncingActiveImage}
+            >
+              <RefreshCw size={18} className={loading || syncingActiveImage ? 'spin' : ''} />
+              {loading ? 'Processing…' : syncingActiveImage ? 'Syncing…' : 'Run segmentation'}
+            </button>
+          </div>
+        }
       />
 
       <div className="engineering-warning">
@@ -61,12 +131,21 @@ export function EngineeringViewPage() {
       <EngineeringCheckpointEditor
         imageWidth={imageWidth}
         imageHeight={imageHeight}
-        imageUrl={image?.url}
+        imageUrl={activeWorkpieceUrl}
       />
 
       <ColorInspectionPanel />
 
-      <div className="engineering-section-title"><div><p className="eyebrow">SEGMENTATION DIAGNOSTICS</p><h2>Image-processing outputs</h2></div><span>Input: {image ? `${image.name} (${image.source === 'upload' ? 'Local upload' : 'Demo'})` : 'harness_sample_01.jpeg'}</span></div>
+      <div className="engineering-section-title">
+        <div>
+          <p className="eyebrow">SEGMENTATION DIAGNOSTICS</p>
+          <h2>Image-processing outputs</h2>
+        </div>
+        <span>
+          Input: {image ? `${image.name} (${image.source === 'upload' ? 'Active upload' : 'Demo'})` : 'harness_sample_01.jpeg'}
+          {syncingActiveImage && ' · Syncing to vision engine…'}
+        </span>
+      </div>
 
       {error && <div className="alert-banner" role="alert"><TriangleAlert size={20} /><div><strong>Segmentation unavailable</strong><span>{error}</span></div></div>}
 
@@ -85,7 +164,14 @@ export function EngineeringViewPage() {
             <article className="panel engineering-image-card" key={key}>
               <div className="panel-header"><div><p className="eyebrow">PROCESSING OUTPUT</p><h2>{title}</h2></div><Icon size={21} /></div>
               <div className="engineering-image-stage">
-                {source ? <img src={source} alt={`${title}: ${description}`} /> : <div className="engineering-loading"><Beaker size={30} /><span>{loading ? 'PROCESSING IMAGE…' : 'NO OUTPUT'}</span></div>}
+                {source ? (
+                  <img src={source} alt={`${title}: ${description}`} />
+                ) : (
+                  <div className="engineering-loading">
+                    <Beaker size={30} className={loading || syncingActiveImage ? 'spin' : ''} />
+                    <span>{syncingActiveImage ? 'SYNCING WORKPIECE…' : loading ? 'PROCESSING IMAGE…' : 'NO OUTPUT'}</span>
+                  </div>
+                )}
               </div>
               <footer><span>{description}</span>{result && <small>{result.metrics.image_width} × {result.metrics.image_height} px</small>}</footer>
             </article>

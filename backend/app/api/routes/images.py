@@ -46,6 +46,10 @@ async def upload_active_image(file: UploadFile = File(...)) -> dict[str, object]
     "/active",
     summary="Retrieve the current active inspection image",
 )
+@router.head(
+    "/active",
+    summary="Check status and headers of current active inspection image",
+)
 def get_active_image() -> Response:
     try:
         record = active_image_service.get_active_image()
@@ -57,6 +61,7 @@ def get_active_image() -> Response:
         media_type=record.content_type,
         headers={
             "Cache-Control": "no-store",
+            "Access-Control-Allow-Origin": "*",
             "X-Image-Source": record.source,
             "X-Image-Filename": record.filename.encode("ascii", "replace").decode("ascii"),
         },

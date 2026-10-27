@@ -10,7 +10,7 @@ const MODEL_ID = 'DEMO-HARNESS-001'
 const supportedColours = new Set(['BLACK', 'WHITE', 'BLUE', 'RED', 'GREEN', 'YELLOW', 'ORANGE', 'GREY', 'GRAY'])
 
 export function ColorInspectionPanel() {
-  const { image } = useInspection()
+  const { image, activeVersion } = useInspection()
   const [checkpoints, setCheckpoints] = useState<EngineeringCheckpoint[]>([])
   const [selectedId, setSelectedId] = useState('')
   const [debug, setDebug] = useState(false)
@@ -22,7 +22,7 @@ export function ColorInspectionPanel() {
   useEffect(() => {
     setResult(null)
     setError(null)
-  }, [image?.name, image?.url])
+  }, [image?.name, image?.url, activeVersion])
 
   const loadColourCheckpoints = useCallback(async () => {
     setLoadingCheckpoints(true)

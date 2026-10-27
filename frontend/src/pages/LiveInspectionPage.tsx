@@ -32,6 +32,7 @@ export function LiveInspectionPage() {
     image,
     setImage,
     setImageBlob,
+    syncingActiveImage,
     imageLoading,
     setImageLoading,
     inspectionState,
@@ -59,7 +60,8 @@ export function LiveInspectionPage() {
       event.target.value = ''
       return
     }
-    setImageBlob(file, file.name, 'upload')
+    void setImageBlob(file, file.name, 'upload')
+    event.target.value = ''
   }
 
   const handleLoadDemo = async () => {
@@ -68,7 +70,7 @@ export function LiveInspectionPage() {
     setError(null)
     try {
       const blob = await loadDemoImage()
-      setImageBlob(blob, 'data/test_images/harness_sample_01.jpeg', 'demo')
+      await setImageBlob(blob, 'data/test_images/harness_sample_01.jpeg', 'demo')
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Unable to load the demo image.')
       setInspectionState('ERROR')
@@ -166,10 +168,10 @@ export function LiveInspectionPage() {
               Model: {DEMO_MODEL_ID}
             </button>
             <input ref={inputRef} className="visually-hidden" type="file" accept="image/jpeg,image/png,image/bmp,.bmp,.jpg,.jpeg,.png" onChange={handleUpload} />
-            <button className="button button--secondary" onClick={() => inputRef.current?.click()} disabled={imageLoading || processing}><ImagePlus size={19} />Upload test image</button>
-            <button className="button button--secondary" onClick={handleLoadDemo} disabled={imageLoading || processing}><FileImage size={19} />{imageLoading ? 'Loading demo…' : 'Load demo image'}</button>
-            <button className="button button--primary" onClick={() => void handleStartInspection()} disabled={!image || imageLoading || processing}><Play size={19} />{processing ? 'Processing…' : 'Start inspection'}</button>
-            <button className="button button--ghost" onClick={handleReset} disabled={processing || (!image && !error)}><RotateCcw size={19} />Reset</button>
+            <button className="button button--secondary" onClick={() => inputRef.current?.click()} disabled={imageLoading || processing || syncingActiveImage}><ImagePlus size={19} />{syncingActiveImage ? 'Syncing image…' : 'Upload test image'}</button>
+            <button className="button button--secondary" onClick={handleLoadDemo} disabled={imageLoading || processing || syncingActiveImage}><FileImage size={19} />{imageLoading ? 'Loading demo…' : 'Load demo image'}</button>
+            <button className="button button--primary" onClick={() => void handleStartInspection()} disabled={!image || imageLoading || processing || syncingActiveImage}><Play size={19} />{processing ? 'Processing…' : 'Start inspection'}</button>
+            <button className="button button--ghost" onClick={handleReset} disabled={processing || syncingActiveImage || (!image && !error)}><RotateCcw size={19} />Reset</button>
           </div>
         </article>
         <aside className="inspection-summary panel">

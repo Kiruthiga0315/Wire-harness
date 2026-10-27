@@ -60,22 +60,62 @@ class HarnessSegmentationService:
             raise ValueError("Expected a BGR colour image with three channels")
 
         height, width = image.shape[:2]
+        total_pixels = float(height * width)
         grayscale = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         blurred = cv2.GaussianBlur(grayscale, (5, 5), 0)
 
-        otsu_threshold, dark_object_mask = cv2.threshold(
+        # 1. Background brightness polarity detection from image borders
+        border_gray = np.concatenate((
+            grayscale[0, :], grayscale[-1, :], grayscale[:, 0], grayscale[:, -1]
+        ))
+        border_median_gray = float(np.median(border_gray))
+        bg_is_light = border_median_gray > 127.0
+
+        # Otsu threshold on grayscale with polarity adaptation
+        thresh_type = cv2.THRESH_BINARY_INV if bg_is_light else cv2.THRESH_BINARY
+        otsu_threshold, gray_mask = cv2.threshold(
             blurred,
             0,
             255,
-            cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU,
+            thresh_type | cv2.THRESH_OTSU,
         )
+
+        # 2. Chromatic distance against median border background color
+        # Captures coloured wires (yellow, red, blue, green) that match grayscale background intensity
+        border_bgr = np.concatenate((
+            image[0, :, :], image[-1, :, :], image[:, 0, :], image[:, -1, :]
+        ), axis=0)
+        bg_color_bgr = np.median(border_bgr, axis=0).astype(np.float32)
+        diff = np.linalg.norm(image.astype(np.float32) - bg_color_bgr, axis=2).astype(np.uint8)
+        diff_blurred = cv2.GaussianBlur(diff, (5, 5), 0)
+        _, color_diff_mask = cv2.threshold(
+            diff_blurred,
+            0,
+            255,
+            cv2.THRESH_BINARY | cv2.THRESH_OTSU,
+        )
+
+        # Combine intensity difference and chromatic difference
+        diff_ratio = float(cv2.countNonZero(color_diff_mask)) / total_pixels
+        gray_ratio = float(cv2.countNonZero(gray_mask)) / total_pixels
+
+        if 0.001 <= diff_ratio <= 0.60 and 0.001 <= gray_ratio <= 0.60:
+            raw_mask = cv2.bitwise_or(gray_mask, color_diff_mask)
+        elif 0.001 <= diff_ratio <= 0.60:
+            raw_mask = color_diff_mask
+        else:
+            raw_mask = gray_mask
+
+        # Guard against inverse polarity runaway
+        if float(cv2.countNonZero(raw_mask)) / total_pixels > 0.70:
+            raw_mask = cv2.bitwise_not(raw_mask)
 
         closing_kernel = cv2.getStructuringElement(
             cv2.MORPH_ELLIPSE,
             (self.closing_kernel_size, self.closing_kernel_size),
         )
         closed_mask = cv2.morphologyEx(
-            dark_object_mask,
+            raw_mask,
             cv2.MORPH_CLOSE,
             closing_kernel,
             iterations=self.closing_iterations,
@@ -83,6 +123,12 @@ class HarnessSegmentationService:
 
         cleaned_mask, removed_component_count = self._remove_small_components(closed_mask)
         cleaned_mask, excluded_border_component_count = self._remove_border_components(cleaned_mask)
+
+        # If strict border filtering excluded everything, recover from closed_mask without border rejection
+        if cv2.countNonZero(cleaned_mask) == 0 and cv2.countNonZero(closed_mask) > 0:
+            cleaned_mask, removed_component_count = self._remove_small_components(closed_mask)
+            excluded_border_component_count = 0
+
         contours, _ = cv2.findContours(
             cleaned_mask,
             cv2.RETR_EXTERNAL,
@@ -97,7 +143,7 @@ class HarnessSegmentationService:
         skeleton_image[skeleton] = 255
 
         occupied_pixels = int(cv2.countNonZero(cleaned_mask))
-        occupied_percentage = round(occupied_pixels * 100.0 / (width * height), 3)
+        occupied_percentage = round(occupied_pixels * 100.0 / total_pixels, 3)
 
         return HarnessSegmentationResult(
             binary_mask=cleaned_mask,

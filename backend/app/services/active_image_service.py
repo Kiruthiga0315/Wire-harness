@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import threading
 from dataclasses import dataclass
@@ -19,6 +20,16 @@ DEMO_IMAGE_CANDIDATES = (
     DEMO_IMAGE_LOGICAL_NAME,
     f"{DEMO_IMAGE_LOGICAL_NAME}.jpeg",
 )
+
+CACHE_DATA_FILENAME = ".active_image_cache.dat"
+CACHE_META_FILENAME = ".active_image_cache.json"
+
+
+def _cache_dir() -> Path:
+    directory = get_settings().project_root / "data" / "test_images"
+    directory.mkdir(parents=True, exist_ok=True)
+    return directory
+
 
 
 def resolve_demo_image() -> Path | None:
@@ -69,10 +80,68 @@ class ActiveImageService:
             source="demo",
         )
 
+    def _load_cached_image(self) -> ActiveImageRecord | None:
+        try:
+            cache_dir = _cache_dir()
+            data_file = cache_dir / CACHE_DATA_FILENAME
+            meta_file = cache_dir / CACHE_META_FILENAME
+            if not data_file.is_file() or not meta_file.is_file():
+                return None
+            meta = json.loads(meta_file.read_text(encoding="utf-8"))
+            data = data_file.read_bytes()
+            bgr_image = decode_uploaded_image(
+                data,
+                filename=meta.get("filename", "cached_image.png"),
+                content_type=meta.get("content_type"),
+            )
+            height, width = bgr_image.shape[:2]
+            return ActiveImageRecord(
+                filename=meta.get("filename", "cached_image.png"),
+                content_type=meta.get("content_type", "image/png"),
+                data=data,
+                bgr_image=bgr_image,
+                width=width,
+                height=height,
+                source=meta.get("source", "upload"),
+            )
+        except Exception as exc:
+            logger.warning("Failed to restore cached active image: %s", exc)
+            return None
+
+    def _persist_cache(self, record: ActiveImageRecord) -> None:
+        try:
+            cache_dir = _cache_dir()
+            data_file = cache_dir / CACHE_DATA_FILENAME
+            meta_file = cache_dir / CACHE_META_FILENAME
+            data_file.write_bytes(record.data)
+            meta = {
+                "filename": record.filename,
+                "content_type": record.content_type,
+                "width": record.width,
+                "height": record.height,
+                "size": len(record.data),
+                "source": record.source,
+            }
+            meta_file.write_text(json.dumps(meta), encoding="utf-8")
+        except Exception as exc:
+            logger.warning("Failed to persist active image cache: %s", exc)
+
+    def _clear_cache(self) -> None:
+        try:
+            cache_dir = _cache_dir()
+            data_file = cache_dir / CACHE_DATA_FILENAME
+            meta_file = cache_dir / CACHE_META_FILENAME
+            if data_file.is_file():
+                data_file.unlink(missing_ok=True)
+            if meta_file.is_file():
+                meta_file.unlink(missing_ok=True)
+        except Exception as exc:
+            logger.warning("Failed to clear active image cache: %s", exc)
+
     def get_active_image(self) -> ActiveImageRecord:
         with self._lock:
             if self._current_image is None:
-                self._current_image = self._load_demo_image()
+                self._current_image = self._load_cached_image() or self._load_demo_image()
             return self._current_image
 
     def set_uploaded_image(
@@ -108,6 +177,7 @@ class ActiveImageService:
         )
         with self._lock:
             self._current_image = record
+            self._persist_cache(record)
         logger.info(
             "Active inspection image updated | file=%s | size=%d | %dx%d",
             filename,
@@ -119,6 +189,7 @@ class ActiveImageService:
 
     def reset_to_demo(self) -> ActiveImageRecord:
         with self._lock:
+            self._clear_cache()
             self._current_image = self._load_demo_image()
         logger.info("Active inspection image reset to demo")
         return self._current_image

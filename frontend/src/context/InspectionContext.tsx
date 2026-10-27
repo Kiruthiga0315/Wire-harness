@@ -14,7 +14,11 @@ export interface LoadedImage {
 interface InspectionContextType {
   image: LoadedImage | null
   setImage: React.Dispatch<React.SetStateAction<LoadedImage | null>>
-  setImageBlob: (blob: Blob, name: string, source: LoadedImage['source']) => void
+  setImageBlob: (blob: Blob, name: string, source: LoadedImage['source']) => Promise<void>
+  uploadActiveImageFile: (file: File) => Promise<void>
+  reloadActiveImage: () => Promise<void>
+  syncingActiveImage: boolean
+  activeVersion: number
   imageLoading: boolean
   setImageLoading: React.Dispatch<React.SetStateAction<boolean>>
   inspectionState: InspectionState
@@ -35,6 +39,8 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
   const objectUrlRef = useRef<string | null>(null)
   const [image, setImage] = useState<LoadedImage | null>(null)
   const [imageLoading, setImageLoading] = useState(false)
+  const [syncingActiveImage, setSyncingActiveImage] = useState(false)
+  const [activeVersion, setActiveVersion] = useState(1)
   const [inspectionState, setInspectionState] = useState<InspectionState>('READY')
   const [inspection, setInspection] = useState<MockInspectionResponse | null>(null)
   const [selectedResult, setSelectedResult] = useState<MockCheckpointResult | null>(null)
@@ -47,24 +53,29 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     }
   }, [])
 
-  useEffect(() => {
-    getActiveImageMetadata()
-      .then((meta) => {
-        if (meta && meta.source === 'upload') {
-          setImage({
-            url: `${ACTIVE_IMAGE_URL}?t=${Date.now()}`,
-            name: meta.filename,
-            source: 'upload',
-            size: meta.size,
-            width: meta.width,
-            height: meta.height,
-          })
-        }
-      })
-      .catch(() => {
-        // Silently ignore initialization error
-      })
+  const reloadActiveImage = useCallback(async () => {
+    try {
+      const meta = await getActiveImageMetadata()
+      if (meta) {
+        const version = Date.now()
+        setImage({
+          url: `${ACTIVE_IMAGE_URL}?v=${version}`,
+          name: meta.filename,
+          source: meta.source,
+          size: meta.size,
+          width: meta.width,
+          height: meta.height,
+        })
+        setActiveVersion(version)
+      }
+    } catch {
+      // Silently ignore initialization error
+    }
   }, [])
+
+  useEffect(() => {
+    void reloadActiveImage()
+  }, [reloadActiveImage])
 
   useEffect(() => {
     return () => releaseObjectUrl()
@@ -76,30 +87,52 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     setInspectionState('READY')
   }, [])
 
-  const setImageBlob = useCallback((blob: Blob, name: string, source: LoadedImage['source']) => {
+  const setImageBlob = useCallback(async (blob: Blob, name: string, source: LoadedImage['source']) => {
     releaseObjectUrl()
-    const url = URL.createObjectURL(blob)
-    objectUrlRef.current = url
-    setImage({ url, name, source, size: blob.size, width: null, height: null })
+    const localUrl = URL.createObjectURL(blob)
+    objectUrlRef.current = localUrl
+    setImage({ url: localUrl, name, source, size: blob.size, width: null, height: null })
     setError(null)
     clearInspection()
+    setSyncingActiveImage(true)
 
-    if (source === 'upload') {
-      void uploadActiveImage(blob, name)
-        .then((meta) => {
-          setImage((current) =>
-            current && current.source === 'upload'
-              ? { ...current, width: meta.width, height: meta.height, size: meta.size }
-              : current
-          )
+    try {
+      if (source === 'upload') {
+        const meta = await uploadActiveImage(blob, name)
+        const version = Date.now()
+        setImage({
+          url: `${ACTIVE_IMAGE_URL}?v=${version}`,
+          name: meta.filename,
+          source: 'upload',
+          size: meta.size,
+          width: meta.width,
+          height: meta.height,
         })
-        .catch((err) => {
-          setError(err instanceof Error ? err.message : 'Failed to sync image to backend.')
+        setActiveVersion(version)
+      } else {
+        await resetActiveImage()
+        const meta = await getActiveImageMetadata()
+        const version = Date.now()
+        setImage({
+          url: `${ACTIVE_IMAGE_URL}?v=${version}`,
+          name: meta?.filename ?? name,
+          source: 'demo',
+          size: meta?.size ?? blob.size,
+          width: meta?.width ?? null,
+          height: meta?.height ?? null,
         })
-    } else {
-      void resetActiveImage()
+        setActiveVersion(version)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to sync image to backend.')
+    } finally {
+      setSyncingActiveImage(false)
     }
   }, [clearInspection, releaseObjectUrl])
+
+  const uploadActiveImageFile = useCallback(async (file: File) => {
+    await setImageBlob(file, file.name, 'upload')
+  }, [setImageBlob])
 
   const handleReset = useCallback(() => {
     releaseObjectUrl()
@@ -107,13 +140,20 @@ export function InspectionProvider({ children }: { children: React.ReactNode }) 
     setError(null)
     setImageLoading(false)
     clearInspection()
+    setSyncingActiveImage(true)
     void resetActiveImage()
-  }, [clearInspection, releaseObjectUrl])
+      .then(() => reloadActiveImage())
+      .finally(() => setSyncingActiveImage(false))
+  }, [clearInspection, releaseObjectUrl, reloadActiveImage])
 
   const value: InspectionContextType = {
     image,
     setImage,
     setImageBlob,
+    uploadActiveImageFile,
+    reloadActiveImage,
+    syncingActiveImage,
+    activeVersion,
     imageLoading,
     setImageLoading,
     inspectionState,

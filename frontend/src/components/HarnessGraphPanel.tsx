@@ -9,7 +9,7 @@ const px = (value: number) => `${value.toFixed(1)} px`
 const degrees = (value: number) => `${value.toFixed(1)}°`
 
 export function HarnessGraphPanel() {
-  const { image } = useInspection()
+  const { image, activeVersion } = useInspection()
   const [result, setResult] = useState<HarnessGraphResponse | null>(null)
   const [processing, setProcessing] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -17,7 +17,7 @@ export function HarnessGraphPanel() {
   useEffect(() => {
     setResult(null)
     setError(null)
-  }, [image?.name, image?.url])
+  }, [image?.name, image?.url, activeVersion])
 
   const analyseGraph = async () => {
     setProcessing(true)

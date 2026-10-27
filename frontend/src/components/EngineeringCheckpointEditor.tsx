@@ -2,7 +2,7 @@ import { Crosshair, Pencil, Save, Trash2, X } from 'lucide-react'
 import { Fragment, useEffect, useState } from 'react'
 import type { MouseEvent } from 'react'
 import { StatusPill } from './StatusPill'
-import { DEMO_IMAGE_URL, createCheckpoint, deleteCheckpoint, getCheckpoints, updateCheckpoint } from '../services/api'
+import { ACTIVE_IMAGE_URL, DEMO_IMAGE_URL, createCheckpoint, deleteCheckpoint, getCheckpoints, updateCheckpoint } from '../services/api'
 import type { CheckpointPayload, EngineeringCheckpoint } from '../types/checkpoint'
 
 const MODEL_ID = 'DEMO-HARNESS-001'
@@ -142,7 +142,7 @@ export function EngineeringCheckpointEditor({ imageWidth, imageHeight, imageUrl 
             role="application"
             aria-label="Click the harness image to add an engineering checkpoint"
           >
-            <img src={imageUrl || DEMO_IMAGE_URL} alt="Harness sample for checkpoint placement" draggable={false} />
+            <img src={imageUrl || ACTIVE_IMAGE_URL} alt="Harness sample for checkpoint placement" draggable={false} />
             {displayCheckpoints.map((checkpoint) => (
               <Fragment key={checkpoint.checkpoint_id}>
                 <span

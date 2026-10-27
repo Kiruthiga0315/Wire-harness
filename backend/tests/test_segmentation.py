@@ -69,3 +69,30 @@ def test_segmentation_service_preserves_edge_touching_workpiece() -> None:
     assert result.excluded_border_component_count == 1
     assert cv2.countNonZero(result.skeleton_image) > 50
 
+
+def test_segmentation_service_supports_dark_background() -> None:
+    # Harness with light/colored wires on a dark background
+    image = np.full((300, 300, 3), 30, dtype=np.uint8)
+    cv2.line(image, (50, 150), (250, 150), (230, 230, 230), 12)
+    cv2.line(image, (150, 150), (150, 50), (0, 0, 240), 8)  # red branch
+
+    result = HarnessSegmentationService().segment(image)
+
+    assert result.contour_count >= 1
+    assert 0 < result.occupied_percentage < 20
+    assert cv2.countNonZero(result.skeleton_image) > 0
+
+
+def test_segmentation_service_supports_chromatic_wires() -> None:
+    # Yellow wire on a light-grey background where grayscale contrast is low
+    image = np.full((300, 300, 3), 180, dtype=np.uint8)
+    # Bright yellow wire: (B=0, G=220, R=220)
+    cv2.line(image, (50, 150), (250, 150), (0, 220, 220), 10)
+
+    result = HarnessSegmentationService().segment(image)
+
+    assert result.contour_count >= 1
+    assert 0 < result.occupied_percentage < 15
+    assert cv2.countNonZero(result.skeleton_image) > 0
+
+
