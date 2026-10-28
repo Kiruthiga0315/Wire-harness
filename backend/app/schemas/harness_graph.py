@@ -27,6 +27,7 @@ class HarnessGraphMetrics(BaseModel):
     extracted_branch_count: int = Field(ge=0)
     topology_terminal_count: int = Field(ge=0)
     unresolved_segment_count: int = Field(ge=0)
+    node_count: int = Field(ge=0)
 
 
 class BranchOrientationResponse(BaseModel):

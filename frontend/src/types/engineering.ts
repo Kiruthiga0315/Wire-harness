@@ -48,6 +48,7 @@ export interface HarnessGraphResponse {
     extracted_branch_count: number
     topology_terminal_count: number
     unresolved_segment_count: number
+    node_count: number
   }
   endpoints: GraphPoint[]
   junctions: GraphPoint[]

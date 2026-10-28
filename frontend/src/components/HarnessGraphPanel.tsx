@@ -48,6 +48,13 @@ export function HarnessGraphPanel() {
         <div className="graph-empty"><GitBranch size={36} /><strong>{processing ? 'ANALYSING SKELETON TOPOLOGY…' : 'GRAPH ANALYSIS NOT RUN'}</strong><span>Run the feasibility analysis to calculate topology and metric (cm) measurements.</span></div>
       ) : (
         <>
+          <div className="graph-metrics" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+            <article><span>No. of Terminals</span><strong>{result.metrics.topology_terminal_count}</strong><small>Usable endpoints</small></article>
+            <article><span>No. of Junctions</span><strong>{result.metrics.clustered_junction_count}</strong><small>Clustered junction centres</small></article>
+            <article><span>No. of Branches</span><strong>{result.metrics.extracted_branch_count}</strong><small>Resolved paths</small></article>
+            <article><span>No. of Nodes</span><strong>{result.metrics.node_count}</strong><small>Terminals + junctions</small></article>
+          </div>
+
           <div className="graph-metrics graph-metrics--measurements">
             <article><span>Total wire centreline</span><strong>{cm(result.metrics.total_wire_length_pixels, ppm)}</strong><small>Calibrated metric length</small></article>
             <article><span>Extracted branches</span><strong>{result.metrics.extracted_branch_count}</strong><small>{cm(result.metrics.extracted_branch_length_pixels, ppm)} combined</small></article>
