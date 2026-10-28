@@ -29,18 +29,15 @@ class HarnessSegmentationResult:
 class HarnessSegmentationService:
     """Experimental dark-object segmentation for controlled feasibility testing.
 
-    This OpenCV pipeline is deliberately simple. It assumes a dark harness on a
-    light inspection surface and is not suitable as a production segmentation
-    algorithm without calibration, lighting control, validation, and model-wise
-    tuning.
+    This OpenCV pipeline assumes a dark harness on a light inspection surface.
     """
 
     def __init__(
         self,
         *,
-        minimum_component_area_ratio: float = 0.0002,
-        closing_kernel_size: int = 7,
-        closing_iterations: int = 2,
+        minimum_component_area_ratio: float = 0.0001,
+        closing_kernel_size: int = 5,
+        closing_iterations: int = 1,
     ) -> None:
         if not 0 < minimum_component_area_ratio < 1:
             raise ValueError("minimum_component_area_ratio must be between 0 and 1")
@@ -65,135 +62,104 @@ class HarnessSegmentationService:
         grayscale = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         blurred = cv2.GaussianBlur(grayscale, (5, 5), 0)
 
-        # Check if this is a wide camera view containing a white inspection table
-        table_box = None
-        if width > 1200:
-            _, bright = cv2.threshold(blurred, 205, 255, cv2.THRESH_BINARY)
-            kernel_table = cv2.getStructuringElement(cv2.MORPH_RECT, (25, 25))
-            table_closed = cv2.morphologyEx(bright, cv2.MORPH_CLOSE, kernel_table)
-            cnts, _ = cv2.findContours(table_closed, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-            max_area = 0.0
-            for c in cnts:
-                area = float(cv2.contourArea(c))
-                if area > (total_pixels * 0.05):
-                    bx, by, bw, bh = cv2.boundingRect(c)
-                    if area > max_area:
-                        max_area = area
-                        table_box = (bx, by, bw, bh)
+        # 1. Background brightness polarity detection from inset image borders
+        # Inset samples avoid dark letterbox margins or phone scanner borders
+        inset_y = max(4, int(height * 0.02))
+        inset_x = max(6, int(width * 0.025))
+        inset_border = np.concatenate((
+            grayscale[inset_y, inset_x:-inset_x],
+            grayscale[-inset_y, inset_x:-inset_x],
+            grayscale[inset_y:-inset_y, inset_x],
+            grayscale[inset_y:-inset_y, -inset_x],
+        ))
+        border_median_gray = float(np.median(inset_border))
+        bg_is_light = border_median_gray > 127.0
 
-        if table_box is not None:
-            tx, ty, tw, th = table_box
-            pad_x, pad_y = int(tw * 0.02), int(th * 0.02)
-            tx1 = max(0, tx + pad_x)
-            ty1 = max(0, ty + pad_y)
-            tx2 = min(width, tx + tw - pad_x)
-            ty2 = min(height, ty + th - pad_y)
+        # Multi-scale detection: captures dark conduits, thin colored wires, and light gray connectors
+        thresh_type = cv2.THRESH_BINARY_INV if bg_is_light else cv2.THRESH_BINARY
+        otsu_threshold_val, gray_mask = cv2.threshold(
+            blurred,
+            0,
+            255,
+            thresh_type | cv2.THRESH_OTSU,
+        )
+        otsu_threshold = float(otsu_threshold_val)
 
-            # Crop to the table ONLY: remove outside floor, room, people, and chairs
-            image = image[ty1:ty2, tx1:tx2]
-            height, width = image.shape[:2]
-            total_pixels = float(height * width)
-            grayscale = grayscale[ty1:ty2, tx1:tx2]
-            blurred = blurred[ty1:ty2, tx1:tx2]
+        # Adaptive threshold for fine thin branches and low-contrast wire strands
+        # Constant 12 prevents smooth table gradients or plastic sheet glare from triggering
+        adapt_mask = cv2.adaptiveThreshold(
+            blurred,
+            255,
+            cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+            cv2.THRESH_BINARY_INV,
+            25,
+            12,
+        )
 
-            otsu_threshold_val, raw_mask = cv2.threshold(
-                blurred,
-                0,
-                255,
-                cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU,
-            )
-            otsu_threshold = float(otsu_threshold_val)
+        # Chromatic saturation threshold to capture vibrant colored wires (blue, yellow, green, red)
+        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        sat_mask = (
+            (hsv[:, :, 1] > 35) & (hsv[:, :, 2] > 40)
+        ).astype(np.uint8) * 255
 
-            closing_kernel = cv2.getStructuringElement(
-                cv2.MORPH_ELLIPSE,
-                (self.closing_kernel_size, self.closing_kernel_size),
-            )
-            closed_mask = cv2.morphologyEx(
-                raw_mask,
-                cv2.MORPH_OPEN,
-                closing_kernel,
-            )
-            closed_mask = cv2.morphologyEx(
-                closed_mask,
-                cv2.MORPH_CLOSE,
-                closing_kernel,
-                iterations=self.closing_iterations,
-            )
-        else:
-            # 1. Background brightness polarity detection from image borders
-            border_gray = np.concatenate((
-                grayscale[0, :], grayscale[-1, :], grayscale[:, 0], grayscale[:, -1]
-            ))
-            border_median_gray = float(np.median(border_gray))
-            bg_is_light = border_median_gray > 127.0
+        # Combine multi-modal evidence
+        raw_mask = cv2.bitwise_or(gray_mask, adapt_mask)
+        raw_mask = cv2.bitwise_or(raw_mask, sat_mask)
 
-            # Otsu threshold on grayscale with polarity adaptation
-            thresh_type = cv2.THRESH_BINARY_INV if bg_is_light else cv2.THRESH_BINARY
-            otsu_threshold_val, gray_mask = cv2.threshold(
-                blurred,
-                0,
-                255,
-                thresh_type | cv2.THRESH_OTSU,
-            )
-            otsu_threshold = float(otsu_threshold_val)
+        # Exclude top calibration measuring tape from the wire harness mask
+        ruler_band = np.zeros((height, width), dtype=bool)
+        ruler_max_y = int(height * 0.038)
+        ruler_band[:ruler_max_y, :] = (
+            (hsv[:ruler_max_y, :, 0] >= 15)
+            & (hsv[:ruler_max_y, :, 0] <= 38)
+            & (hsv[:ruler_max_y, :, 1] >= 55)
+        )
+        ruler_mask = cv2.dilate(
+            ruler_band.astype(np.uint8) * 255,
+            cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5)),
+        ) > 0
+        raw_mask[ruler_mask] = 0
+        raw_mask[: int(height * 0.012), :] = 0
+        # Exclude letterbox padding on outer columns if present
+        if width > 100:
+            margin_w = max(3, int(width * 0.015))
+            if np.mean(grayscale[:, :margin_w]) < 80:
+                raw_mask[:, :margin_w] = 0
+            if np.mean(grayscale[:, -margin_w:]) < 80:
+                raw_mask[:, -margin_w:] = 0
 
-            # 2. Chromatic distance against median border background color
-            # Captures coloured wires (yellow, red, blue, green) that match grayscale background intensity
-            border_bgr = np.concatenate((
-                image[0, :, :], image[-1, :, :], image[:, 0, :], image[:, -1, :]
-            ), axis=0)
-            bg_color_bgr = np.median(border_bgr, axis=0).astype(np.float32)
-            diff = np.linalg.norm(image.astype(np.float32) - bg_color_bgr, axis=2).astype(np.uint8)
-            diff_blurred = cv2.GaussianBlur(diff, (5, 5), 0)
-            _, color_diff_mask = cv2.threshold(
-                diff_blurred,
-                0,
-                255,
-                cv2.THRESH_BINARY | cv2.THRESH_OTSU,
-            )
+        # Guard against inverse polarity runaway
+        if float(cv2.countNonZero(raw_mask)) / total_pixels > 0.70:
+            raw_mask = cv2.bitwise_not(raw_mask)
 
-            # Combine intensity difference and chromatic difference
-            diff_ratio = float(cv2.countNonZero(color_diff_mask)) / total_pixels
-            gray_ratio = float(cv2.countNonZero(gray_mask)) / total_pixels
+        closing_kernel = cv2.getStructuringElement(
+            cv2.MORPH_ELLIPSE,
+            (self.closing_kernel_size, self.closing_kernel_size),
+        )
+        closed_mask = cv2.morphologyEx(
+            raw_mask,
+            cv2.MORPH_OPEN,
+            closing_kernel,
+        )
+        closed_mask = cv2.morphologyEx(
+            closed_mask,
+            cv2.MORPH_CLOSE,
+            closing_kernel,
+            iterations=self.closing_iterations,
+        )
 
-            if 0.001 <= diff_ratio <= 0.60 and 0.001 <= gray_ratio <= 0.60:
-                raw_mask = cv2.bitwise_or(gray_mask, color_diff_mask)
-            elif 0.001 <= diff_ratio <= 0.60:
-                raw_mask = color_diff_mask
-            else:
-                raw_mask = gray_mask
-
-            # Guard against inverse polarity runaway
-            if float(cv2.countNonZero(raw_mask)) / total_pixels > 0.70:
-                raw_mask = cv2.bitwise_not(raw_mask)
-
-            closing_kernel = cv2.getStructuringElement(
-                cv2.MORPH_ELLIPSE,
-                (self.closing_kernel_size, self.closing_kernel_size),
-            )
-            closed_mask = cv2.morphologyEx(
-                raw_mask,
-                cv2.MORPH_CLOSE,
-                closing_kernel,
-                iterations=self.closing_iterations,
-            )
-
-        cleaned_mask, removed_component_count = self._remove_small_components(closed_mask)
-        cleaned_mask, excluded_border_component_count = self._remove_border_components(cleaned_mask)
-
-        # If strict border filtering excluded everything, recover from closed_mask without border rejection
-        if cv2.countNonZero(cleaned_mask) == 0 and cv2.countNonZero(closed_mask) > 0:
-            cleaned_mask, removed_component_count = self._remove_small_components(closed_mask)
-            excluded_border_component_count = 0
+        cleaned_mask, removed_component_count, excluded_border_component_count = (
+            self._remove_artifacts_and_borders(closed_mask, grayscale, hsv)
+        )
 
         contours, _ = cv2.findContours(
             cleaned_mask,
-            cv2.RETR_EXTERNAL,
+            cv2.RETR_TREE,
             cv2.CHAIN_APPROX_SIMPLE,
         )
 
         contour_image = image.copy()
-        cv2.drawContours(contour_image, contours, -1, (0, 0, 255), 3, cv2.LINE_AA)
+        cv2.drawContours(contour_image, contours, -1, (0, 0, 255), 2, cv2.LINE_AA)
 
         skeleton = skeletonize(cleaned_mask > 0)
         skeleton_image = np.zeros_like(cleaned_mask)
@@ -216,65 +182,53 @@ class HarnessSegmentationService:
             cropped_base_image=image.copy(),
         )
 
-    def _remove_small_components(self, mask: ImageArray) -> tuple[ImageArray, int]:
+    @staticmethod
+    def _remove_artifacts_and_borders(
+        mask: ImageArray,
+        grayscale: ImageArray,
+        hsv: ImageArray,
+    ) -> tuple[ImageArray, int, int]:
+        """Eliminate non-wire table artifacts (glare, paper/plastic crease) and peripheral border shadow."""
         component_count, labels, statistics, _ = cv2.connectedComponentsWithStats(
             mask,
             connectivity=8,
         )
-        minimum_area = max(64, round(mask.size * self.minimum_component_area_ratio))
-        cleaned = np.zeros_like(mask)
-        removed_count = 0
-
-        for label in range(1, component_count):
-            area = int(statistics[label, cv2.CC_STAT_AREA])
-            if area >= minimum_area:
-                cleaned[labels == label] = 255
-            else:
-                removed_count += 1
-
-        return cleaned, removed_count
-
-    @staticmethod
-    def _remove_border_components(mask: ImageArray) -> tuple[ImageArray, int]:
-        """Reject peripheral border capture artifacts while preserving spanning workpieces."""
-        component_count, labels, statistics, centroids = cv2.connectedComponentsWithStats(
-            mask,
-            connectivity=8,
-        )
         if component_count <= 1:
-            return mask.copy(), 0
+            return mask.copy(), 0, 0
 
         height, width = mask.shape[:2]
         total_pixels = float(height * width)
+        cleaned = np.zeros_like(mask)
+        removed_small = 0
+        excluded_artifacts = 0
 
-        border_labels = np.unique(
-            np.concatenate((labels[0, :], labels[-1, :], labels[:, 0], labels[:, -1]))
-        )
-        border_labels = border_labels[border_labels != 0]
+        minimum_area = max(24, round(total_pixels * 0.00005))
+        ruler_zone_h = int(height * 0.045)
 
-        cleaned = mask.copy()
-        excluded_count = 0
-
-        for label in border_labels:
-            area = float(statistics[label, cv2.CC_STAT_AREA])
-            comp_w = float(statistics[label, cv2.CC_STAT_WIDTH])
-            comp_h = float(statistics[label, cv2.CC_STAT_HEIGHT])
-            cx, cy = centroids[label]
-
-            # A genuine harness workpiece that touches or reaches near the edge
-            # spans a large fraction of the frame and has its center of mass inside.
-            is_spanning_workpiece = (
-                (comp_w >= 0.30 * width and comp_h >= 0.30 * height)
-                or (area >= 0.04 * total_pixels)
-            )
-            is_central = (0.08 * width <= cx <= 0.92 * width) and (
-                0.08 * height <= cy <= 0.92 * height
-            )
-
-            if is_spanning_workpiece and is_central:
+        for label in range(1, component_count):
+            area = int(statistics[label, cv2.CC_STAT_AREA])
+            if area < minimum_area:
+                removed_small += 1
                 continue
 
-            cleaned[labels == label] = 0
-            excluded_count += 1
+            comp_y = int(statistics[label, cv2.CC_STAT_TOP])
+            comp_h = int(statistics[label, cv2.CC_STAT_HEIGHT])
+            comp_pixels = labels == label
 
-        return cleaned, excluded_count
+            comp_gray_min = int(np.min(grayscale[comp_pixels]))
+            comp_sat_max = int(np.max(hsv[:, :, 1][comp_pixels]))
+
+            # 1. Reject non-wire table glare or clear plastic document sleeve crease
+            has_wire_evidence = (comp_gray_min < 178) or (comp_sat_max > 32)
+            if not has_wire_evidence:
+                excluded_artifacts += 1
+                continue
+
+            # 2. Reject top-border corner shadow/clamp
+            if comp_y == 0 and (comp_y + comp_h <= ruler_zone_h):
+                excluded_artifacts += 1
+                continue
+
+            cleaned[comp_pixels] = 255
+
+        return cleaned, removed_small, excluded_artifacts

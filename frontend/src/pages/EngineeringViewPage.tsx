@@ -14,7 +14,7 @@ const MAX_UPLOAD_BYTES = 15 * 1024 * 1024
 
 const resultPanels = [
   { key: 'binary_mask', title: 'Binary mask', description: 'Cleaned dark-object segmentation', icon: Binary },
-  { key: 'contour_image', title: 'Contour image', description: 'External contours in red', icon: Boxes },
+  { key: 'contour_image', title: 'Contour image', description: 'Wire contours in red', icon: Boxes },
   { key: 'skeleton_image', title: 'Skeleton', description: 'Single-pixel centreline representation', icon: Network },
 ] as const
 

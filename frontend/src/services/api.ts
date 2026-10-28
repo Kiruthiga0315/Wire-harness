@@ -11,6 +11,8 @@ const DEMO_IMAGE_PATH = '/api/test-images/harness_sample_01.jpeg'
 export const DEMO_IMAGE_URL = `${API_BASE_URL}${DEMO_IMAGE_PATH}`
 export const ACTIVE_IMAGE_URL = `${API_BASE_URL}/api/test-images/active`
 export const ACTIVE_CROPPED_IMAGE_URL = `${API_BASE_URL}/api/test-images/active/cropped`
+export const GOLDEN_HARNESS_URL = `${API_BASE_URL}/api/golden-reference/images/golden_harness.png`
+export const GOLDEN_SHEET_URL = `${API_BASE_URL}/api/golden-reference/images/measurement_sheet.png`
 
 export interface ActiveImageMetadata {
   filename: string
@@ -276,5 +278,155 @@ export async function downloadDemoReportCsv(): Promise<void> {
   } catch (error) {
     if (error instanceof ApiError) throw error
     throw new ApiError('CSV export unavailable. Check that the backend is running.')
+  }
+}
+
+export async function getGoldenReference(signal?: AbortSignal): Promise<import('../types/goldenReference').GoldenReferenceConfig> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/golden-reference`, { signal })
+    if (!response.ok) {
+      throw new ApiError('Could not load golden reference configuration.', response.status)
+    }
+    return (await response.json()) as import('../types/goldenReference').GoldenReferenceConfig
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') throw error
+    if (error instanceof ApiError) throw error
+    throw new ApiError('Golden reference service unavailable.')
+  }
+}
+
+export async function updateGoldenCheckpoint(
+  checkpointId: string,
+  payload: Partial<import('../types/goldenReference').GoldenCheckpoint>,
+): Promise<import('../types/goldenReference').GoldenCheckpoint> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/golden-reference/checkpoints/${encodeURIComponent(checkpointId)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    if (!response.ok) {
+      throw new ApiError(`Failed to update checkpoint ${checkpointId}`, response.status)
+    }
+    return (await response.json()) as import('../types/goldenReference').GoldenCheckpoint
+  } catch (error) {
+    if (error instanceof ApiError) throw error
+    throw new ApiError('Failed to communicate with golden reference service.')
+  }
+}
+
+export async function addGoldenCheckpoint(
+  payload: import('../types/goldenReference').GoldenCheckpoint,
+): Promise<import('../types/goldenReference').GoldenCheckpoint> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/golden-reference/checkpoints`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    if (!response.ok) {
+      throw new ApiError('Failed to create checkpoint', response.status)
+    }
+    return (await response.json()) as import('../types/goldenReference').GoldenCheckpoint
+  } catch (error) {
+    if (error instanceof ApiError) throw error
+    throw new ApiError('Failed to create golden checkpoint.')
+  }
+}
+
+export async function deleteGoldenCheckpoint(checkpointId: string): Promise<void> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/golden-reference/checkpoints/${encodeURIComponent(checkpointId)}`, {
+      method: 'DELETE',
+    })
+    if (!response.ok) {
+      throw new ApiError(`Failed to delete checkpoint ${checkpointId}`, response.status)
+    }
+  } catch (error) {
+    if (error instanceof ApiError) throw error
+    throw new ApiError('Failed to delete golden checkpoint.')
+  }
+}
+
+export async function updateGoldenCalibration(
+  calibration: import('../types/goldenReference').GoldenCalibration,
+): Promise<import('../types/goldenReference').GoldenCalibration> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/golden-reference/calibration`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(calibration),
+    })
+    if (!response.ok) {
+      throw new ApiError('Failed to update calibration', response.status)
+    }
+    return (await response.json()) as import('../types/goldenReference').GoldenCalibration
+  } catch (error) {
+    if (error instanceof ApiError) throw error
+    throw new ApiError('Failed to save calibration.')
+  }
+}
+
+export async function resetGoldenReference(): Promise<import('../types/goldenReference').GoldenReferenceConfig> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/golden-reference/reset`, {
+      method: 'POST',
+    })
+    if (!response.ok) {
+      throw new ApiError('Failed to reset golden reference', response.status)
+    }
+    return (await response.json()) as import('../types/goldenReference').GoldenReferenceConfig
+  } catch (error) {
+    if (error instanceof ApiError) throw error
+    throw new ApiError('Failed to reset golden reference.')
+  }
+}
+
+export async function runGoldenInspection(pixelsPerMm?: number): Promise<import('../types/goldenReference').GoldenInspectionResponse> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/golden-reference/inspect`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ use_active_image: true, pixels_per_mm: pixelsPerMm }),
+    })
+    if (!response.ok) {
+      let detail = 'Golden reference inspection failed.'
+      try {
+        const err = await response.json() as { detail?: string }
+        if (err.detail) detail = err.detail
+      } catch {
+        // Fallback
+      }
+      throw new ApiError(detail, response.status)
+    }
+    return (await response.json()) as import('../types/goldenReference').GoldenInspectionResponse
+  } catch (error) {
+    if (error instanceof ApiError) throw error
+    throw new ApiError('Inspection service error.')
+  }
+}
+
+export async function runUploadedGoldenInspection(file: File): Promise<import('../types/goldenReference').GoldenInspectionResponse> {
+  try {
+    const formData = new FormData()
+    formData.append('file', file)
+    const response = await fetch(`${API_BASE_URL}/api/golden-reference/inspect-upload`, {
+      method: 'POST',
+      body: formData,
+    })
+    if (!response.ok) {
+      let detail = 'Image inspection failed.'
+      try {
+        const err = await response.json() as { detail?: string }
+        if (err.detail) detail = err.detail
+      } catch {
+        // Fallback
+      }
+      throw new ApiError(detail, response.status)
+    }
+    return (await response.json()) as import('../types/goldenReference').GoldenInspectionResponse
+  } catch (error) {
+    if (error instanceof ApiError) throw error
+    throw new ApiError('Failed to upload and inspect against golden reference.')
   }
 }
