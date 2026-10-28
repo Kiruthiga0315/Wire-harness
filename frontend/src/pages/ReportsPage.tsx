@@ -105,7 +105,7 @@ export function ReportsPage() {
             <article className="panel report-image-panel">
               <div className="panel-header"><div><p className="eyebrow">ANNOTATED MEASUREMENT EVIDENCE</p><h2>Harness length image</h2></div><StatusPill tone="pass">METRIC · CALIBRATED (cm)</StatusPill></div>
               <div className="report-image-stage"><img src={report.annotated_image} alt={`Annotated harness showing total wire centreline length ${cm(report.total_wire_length_pixels, ppm)}`} /></div>
-              <footer><span>Cyan path: extracted centreline · Yellow labels: longest resolved branches</span><strong>Total: {cm(report.total_wire_length_pixels, ppm)}</strong></footer>
+              <footer><span>Cyan path: extracted centreline · Metric callouts: longest resolved branches (cm)</span><strong>Total: {cm(report.total_wire_length_pixels, ppm)}</strong></footer>
             </article>
 
             <aside className="panel report-identity-panel">

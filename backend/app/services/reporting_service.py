@@ -69,14 +69,14 @@ class ReportingService:
         total_wire_length_cm = graph.total_wire_length_pixels / pixels_per_cm
 
         banner = canvas.copy()
-        cv2.rectangle(banner, (12, 12), (width - 12, 108), (48, 29, 8), -1)
+        cv2.rectangle(banner, (12, 12), (width - 12, 114), (48, 29, 8), -1)
         cv2.addWeighted(banner, 0.88, canvas, 0.12, 0, canvas)
         cv2.putText(
             canvas,
             "TOTAL WIRE CENTRELINE",
-            (28, 43),
+            (24, 38),
             cv2.FONT_HERSHEY_SIMPLEX,
-            0.58,
+            0.55,
             (205, 225, 238),
             1,
             cv2.LINE_AA,
@@ -84,19 +84,19 @@ class ReportingService:
         cv2.putText(
             canvas,
             f"{total_wire_length_cm:,.1f} cm",
-            (28, 82),
+            (24, 76),
             cv2.FONT_HERSHEY_DUPLEX,
-            1.08,
+            1.05,
             (70, 220, 255),
             2,
             cv2.LINE_AA,
         )
         cv2.putText(
             canvas,
-            "8-CONNECTED WEIGHTED SKELETON / CALIBRATED (cm)",
-            (260, 82),
+            f"8-CONNECTED WEIGHTED SKELETON · CALIBRATED ({pixels_per_cm:.2f} px/cm)",
+            (24, 100),
             cv2.FONT_HERSHEY_SIMPLEX,
-            0.37,
+            0.35,
             (188, 205, 216),
             1,
             cv2.LINE_AA,
@@ -146,16 +146,16 @@ class ReportingService:
         branch_cm = branch.path_length_pixels / pixels_per_cm
         label = f"{branch.branch_id} {branch_cm:.1f}cm"
         (text_width, text_height), _ = cv2.getTextSize(
-            label, cv2.FONT_HERSHEY_SIMPLEX, 0.34, 1
+            label, cv2.FONT_HERSHEY_SIMPLEX, 0.36, 1
         )
-        x = max(4, min(x - text_width // 2, canvas.shape[1] - text_width - 8))
-        y = max(122, min(y, canvas.shape[0] - 52))
+        x = max(6, min(x - text_width // 2, canvas.shape[1] - text_width - 10))
+        y = max(130, min(y, canvas.shape[0] - 52))
         for y_offset in (0, -22, 22, -44, 44, -66, 66):
-            candidate_y = max(122, min(y + y_offset, canvas.shape[0] - 52))
+            candidate_y = max(130, min(y + y_offset, canvas.shape[0] - 52))
             candidate = (
-                x - 3,
+                x - 4,
                 candidate_y - text_height - 4,
-                x + text_width + 3,
+                x + text_width + 4,
                 candidate_y + 4,
             )
             if not any(
@@ -170,18 +170,25 @@ class ReportingService:
                 break
         cv2.rectangle(
             canvas,
-            (x - 3, y - text_height - 4),
-            (x + text_width + 3, y + 4),
-            (48, 29, 8),
+            (x - 4, y - text_height - 4),
+            (x + text_width + 4, y + 4),
+            (15, 23, 42),
             -1,
+        )
+        cv2.rectangle(
+            canvas,
+            (x - 4, y - text_height - 4),
+            (x + text_width + 4, y + 4),
+            (70, 220, 255),
+            1,
         )
         cv2.putText(
             canvas,
             label,
             (x, y),
             cv2.FONT_HERSHEY_SIMPLEX,
-            0.34,
-            (70, 220, 255),
+            0.36,
+            (255, 255, 255),
             1,
             cv2.LINE_AA,
         )
