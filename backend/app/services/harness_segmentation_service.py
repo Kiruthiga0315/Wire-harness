@@ -135,12 +135,24 @@ class HarnessSegmentationService:
             cv2.CHAIN_APPROX_SIMPLE,
         )
 
+        contour_thickness = max(2, int(round(max(width, height) / 350.0)))
         contour_image = image.copy()
-        cv2.drawContours(contour_image, contours, -1, (0, 0, 255), 3, cv2.LINE_AA)
+        cv2.drawContours(contour_image, contours, -1, (0, 0, 255), contour_thickness, cv2.LINE_AA)
 
         skeleton = skeletonize(cleaned_mask > 0)
-        skeleton_image = np.zeros_like(cleaned_mask)
-        skeleton_image[skeleton] = 255
+        skeleton_raw = np.zeros_like(cleaned_mask)
+        skeleton_raw[skeleton] = 255
+
+        # Adaptively dilate skeleton so high-resolution workpieces maintain visible centreline thickness in UI cards
+        skeleton_dilation = max(1, int(round(max(width, height) / 600.0)))
+        if skeleton_dilation > 1:
+            dilation_kernel = cv2.getStructuringElement(
+                cv2.MORPH_RECT,
+                (skeleton_dilation, skeleton_dilation),
+            )
+            skeleton_image = cv2.dilate(skeleton_raw, dilation_kernel, iterations=1)
+        else:
+            skeleton_image = skeleton_raw
 
         occupied_pixels = int(cv2.countNonZero(cleaned_mask))
         occupied_percentage = round(occupied_pixels * 100.0 / total_pixels, 3)

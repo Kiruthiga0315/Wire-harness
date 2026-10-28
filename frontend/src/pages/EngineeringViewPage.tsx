@@ -25,6 +25,10 @@ export function EngineeringViewPage() {
   const [error, setError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  useEffect(() => {
+    setResult(null)
+  }, [activeVersion, syncingActiveImage])
+
   const processImage = useCallback(async (signal?: AbortSignal) => {
     setLoading(true)
     setError(null)
@@ -164,12 +168,12 @@ export function EngineeringViewPage() {
             <article className="panel engineering-image-card" key={key}>
               <div className="panel-header"><div><p className="eyebrow">PROCESSING OUTPUT</p><h2>{title}</h2></div><Icon size={21} /></div>
               <div className="engineering-image-stage">
-                {source ? (
+                {source && !syncingActiveImage && !loading ? (
                   <img src={source} alt={`${title}: ${description}`} />
                 ) : (
                   <div className="engineering-loading">
                     <Beaker size={30} className={loading || syncingActiveImage ? 'spin' : ''} />
-                    <span>{syncingActiveImage ? 'SYNCING WORKPIECE…' : loading ? 'PROCESSING IMAGE…' : 'NO OUTPUT'}</span>
+                    <span>{syncingActiveImage ? 'UPLOADING WORKPIECE…' : loading ? 'ANALYSING WORKPIECE…' : 'NO OUTPUT'}</span>
                   </div>
                 )}
               </div>
