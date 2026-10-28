@@ -1,9 +1,12 @@
+from __future__ import annotations
+
 from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, Field
 
 from app.schemas.inspection import MockCheckpointResult
+from app.schemas.sticker import StickerFieldData, StickerInspectionReport
 
 
 class ReportBranchMeasurement(BaseModel):
@@ -46,4 +49,5 @@ class InspectionReportResponse(BaseModel):
     annotated_image: str
     checkpoint_results: list[MockCheckpointResult]
     branch_measurements: list[ReportBranchMeasurement]
+    sticker_inspection: StickerInspectionReport
     disclaimer: str

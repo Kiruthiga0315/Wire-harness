@@ -1,3 +1,5 @@
+import type { StickerInspectionReport } from './report'
+
 export type CheckpointInspectionStatus = 'PASS' | 'NG'
 export type InspectionState = 'READY' | 'CAPTURING' | 'PROCESSING' | 'PASS' | 'NG' | 'ERROR'
 
@@ -39,4 +41,5 @@ export interface MockInspectionResponse {
   crop_width?: number | null
   crop_height?: number | null
   is_cropped?: boolean
+  sticker_inspection?: StickerInspectionReport | null
 }

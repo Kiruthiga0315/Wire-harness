@@ -1,7 +1,11 @@
+from __future__ import annotations
+
 from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, Field
+
+from app.schemas.sticker import StickerInspectionReport
 
 
 class MockInspectionRequest(BaseModel):
@@ -46,3 +50,4 @@ class MockInspectionResponse(BaseModel):
     crop_width: int | None = None
     crop_height: int | None = None
     is_cropped: bool = False
+    sticker_inspection: StickerInspectionReport | None = None

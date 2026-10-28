@@ -3,7 +3,7 @@ import type { HarnessGraphResponse, SegmentationResponse } from '../types/engine
 import type { CheckpointPayload, EngineeringCheckpoint } from '../types/checkpoint'
 import type { MockInspectionResponse } from '../types/inspection'
 import type { ColorInspectionResponse } from '../types/colorInspection'
-import type { InspectionReportResponse } from '../types/report'
+import type { InspectionReportResponse, StickerInspectionReport } from '../types/report'
 
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
 const DEMO_IMAGE_PATH = '/api/test-images/harness_sample_01.jpeg'
@@ -163,6 +163,21 @@ async function checkpointRequest<T>(url: string, init?: RequestInit): Promise<T>
   } catch (error) {
     if (error instanceof ApiError) throw error
     throw new ApiError('Checkpoint database unavailable. Check that the backend is running.')
+  }
+}
+
+export async function runStickerInspection(): Promise<StickerInspectionReport> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/inspections/sticker`, {
+      method: 'POST',
+    })
+    if (!response.ok) {
+      throw new ApiError('Specification sticker inspection failed.', response.status)
+    }
+    return await response.json() as StickerInspectionReport
+  } catch (error) {
+    if (error instanceof ApiError) throw error
+    throw new ApiError('Sticker inspection service unavailable. Check that the backend is running.')
   }
 }
 
@@ -428,5 +443,28 @@ export async function runUploadedGoldenInspection(file: File): Promise<import('.
   } catch (error) {
     if (error instanceof ApiError) throw error
     throw new ApiError('Failed to upload and inspect against golden reference.')
+  }
+}
+
+export async function downloadDemoReportPdf(): Promise<void> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/reports/demo/export.pdf`, { cache: 'no-store' })
+    if (!response.ok) {
+      throw new ApiError('PDF report could not be generated.', response.status)
+    }
+    const blob = await response.blob()
+    const disposition = response.headers.get('Content-Disposition') ?? ''
+    const filename = disposition.match(/filename="([^"]+)"/)?.[1] ?? 'wire-harness-inspection-report.pdf'
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = filename
+    document.body.appendChild(anchor)
+    anchor.click()
+    anchor.remove()
+    URL.revokeObjectURL(url)
+  } catch (error) {
+    if (error instanceof ApiError) throw error
+    throw new ApiError('PDF export unavailable. Check that the backend is running.')
   }
 }

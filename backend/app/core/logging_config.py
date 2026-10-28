@@ -6,7 +6,11 @@ from pathlib import Path
 
 
 def configure_logging(log_directory: Path, level: str = "INFO") -> None:
-    log_directory.mkdir(parents=True, exist_ok=True)
+    try:
+        log_directory.mkdir(parents=True, exist_ok=True)
+    except (PermissionError, OSError):
+        pass
+
     formatter = logging.Formatter(
         "%(asctime)s | %(levelname)s | %(name)s | %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
@@ -14,17 +18,22 @@ def configure_logging(log_directory: Path, level: str = "INFO") -> None:
 
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(formatter)
+    handlers: list[logging.Handler] = [console_handler]
 
-    file_handler = RotatingFileHandler(
-        log_directory / "application.log",
-        maxBytes=5_000_000,
-        backupCount=5,
-        encoding="utf-8",
-    )
-    file_handler.setFormatter(formatter)
+    try:
+        file_handler = RotatingFileHandler(
+            log_directory / "application.log",
+            maxBytes=5_000_000,
+            backupCount=5,
+            encoding="utf-8",
+        )
+        file_handler.setFormatter(formatter)
+        handlers.append(file_handler)
+    except (PermissionError, OSError):
+        pass
 
     logging.basicConfig(
         level=getattr(logging, level.upper(), logging.INFO),
-        handlers=[console_handler, file_handler],
+        handlers=handlers,
         force=True,
     )

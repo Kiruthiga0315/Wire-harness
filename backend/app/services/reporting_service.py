@@ -15,6 +15,10 @@ from app.services.harness_graph_service import (
 )
 from app.services.harness_segmentation_service import HarnessSegmentationService, ImageArray
 from app.services.mock_inspection_service import MockInspectionService
+from app.services.sticker_inspection_service import (
+    StickerInspectionOutcome,
+    StickerInspectionService,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -24,15 +28,17 @@ class InspectionReportResult:
     inspection: MockInspectionResponse
     graph: HarnessGraphResult
     annotated_image: ImageArray
+    sticker: StickerInspectionOutcome
 
 
 class ReportingService:
-    """Builds an in-memory development report without altering its source image."""
+    """Builds an in-memory development report with graph topology and sticker OCR verification."""
 
     def __init__(self) -> None:
         self.segmentation_service = HarnessSegmentationService()
         self.graph_service = HarnessGraphService()
         self.inspection_service = MockInspectionService()
+        self.sticker_service = StickerInspectionService()
 
     def generate(
         self,
@@ -43,13 +49,16 @@ class ReportingService:
         inspection = self.inspection_service.evaluate(model, checkpoints)
         segmentation = self.segmentation_service.segment(image)
         graph = self.graph_service.analyse(segmentation.binary_mask, base_image=image)
+        sticker = self.sticker_service.inspect(image)
         generated_at = datetime.now(UTC)
+
         return InspectionReportResult(
             report_id=f"RPT-{generated_at:%Y%m%d-%H%M%S}",
             generated_at=generated_at,
             inspection=inspection,
             graph=graph,
             annotated_image=self._annotate_measurements(graph),
+            sticker=sticker,
         )
 
     @staticmethod
@@ -109,7 +118,10 @@ class ReportingService:
             reverse=True,
         )[:10]
         occupied_labels: list[tuple[int, int, int, int]] = []
+
         for branch in labelled_branches:
+            if branch.source_node_id not in node_points or branch.target_node_id not in node_points:
+                continue
             ReportingService._draw_branch_label(
                 canvas,
                 branch,

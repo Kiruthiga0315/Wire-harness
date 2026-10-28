@@ -86,7 +86,7 @@ class HarnessGraphService:
     decision inputs.
     """
 
-    def __init__(self, *, junction_cluster_radius: int = 6) -> None:
+    def __init__(self, *, junction_cluster_radius: int = 10) -> None:
         if junction_cluster_radius < 1:
             raise ValueError("junction_cluster_radius must be at least 1")
         self.junction_cluster_radius = junction_cluster_radius
@@ -131,8 +131,7 @@ class HarnessGraphService:
         skeleton_image = skeleton * 255
         overlay_image = self._draw_overlay(
             skeleton_image,
-            endpoints=endpoints,
-            junctions=junctions,
+            nodes=nodes,
             base_image=base_image,
         )
         return HarnessGraphResult(
@@ -398,10 +397,18 @@ class HarnessGraphService:
     def _draw_overlay(
         skeleton_image: ImageArray,
         *,
-        endpoints: list[GraphPoint],
-        junctions: list[GraphPoint],
+        nodes: list["GraphNode"],
         base_image: ImageArray | None,
     ) -> ImageArray:
+        """Draw the skeleton path and all resolved graph nodes on a canvas.
+
+        Every node in the resolved topology list is drawn:
+        - END_TERMINAL nodes: white outline + green fill circle (radius 6)
+        - JUNCTION nodes:     white outline + blue fill circle (radius 10)
+
+        Node positions come from the topology-resolved node list, so they
+        exactly match what is reported in the API response.
+        """
         height, width = skeleton_image.shape
         if base_image is None:
             canvas = cv2.cvtColor(skeleton_image, cv2.COLOR_GRAY2BGR)
@@ -409,6 +416,8 @@ class HarnessGraphService:
             if base_image.ndim != 3 or base_image.shape[:2] != (height, width):
                 raise ValueError("Base image dimensions must match the binary mask")
             canvas = base_image.copy()
+
+        # Draw skeleton centreline (amber/orange tint blended over the source image)
         visible_path = cv2.dilate(
             skeleton_image,
             cv2.getStructuringElement(cv2.MORPH_CROSS, (3, 3)),
@@ -419,10 +428,19 @@ class HarnessGraphService:
         canvas[path_pixels] = (
             canvas[path_pixels].astype(np.float32) * 0.35 + path_colour * 0.65
         ).astype(np.uint8)
-        for point in endpoints:
-            cv2.circle(canvas, (point.x, point.y), 6, (255, 255, 255), 3, cv2.LINE_AA)
-            cv2.circle(canvas, (point.x, point.y), 5, (0, 190, 70), 2, cv2.LINE_AA)
-        for point in junctions:
-            cv2.circle(canvas, (point.x, point.y), 10, (255, 255, 255), 4, cv2.LINE_AA)
-            cv2.circle(canvas, (point.x, point.y), 9, (0, 0, 230), 3, cv2.LINE_AA)
+
+        # Draw terminal nodes first (smaller, so junctions render on top at crossings)
+        for node in nodes:
+            if node.node_type == "END_TERMINAL":
+                cv2.circle(canvas, (node.point.x, node.point.y), 7, (255, 255, 255), -1, cv2.LINE_AA)
+                cv2.circle(canvas, (node.point.x, node.point.y), 6, (0, 190, 70), -1, cv2.LINE_AA)
+                cv2.circle(canvas, (node.point.x, node.point.y), 3, (255, 255, 255), -1, cv2.LINE_AA)
+
+        # Draw junction nodes on top (larger, clearly distinguishable)
+        for node in nodes:
+            if node.node_type == "JUNCTION":
+                cv2.circle(canvas, (node.point.x, node.point.y), 11, (255, 255, 255), -1, cv2.LINE_AA)
+                cv2.circle(canvas, (node.point.x, node.point.y), 9, (0, 0, 230), -1, cv2.LINE_AA)
+                cv2.circle(canvas, (node.point.x, node.point.y), 4, (255, 255, 255), -1, cv2.LINE_AA)
+
         return canvas

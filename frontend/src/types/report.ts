@@ -12,6 +12,26 @@ export interface ReportBranchMeasurement {
   unit?: string
 }
 
+export interface StickerFieldData {
+  harness_code: string | null
+  part_number: string | null
+  description: string | null
+  drawing_number: string | null
+  serial_number: string | null
+  barcode_payload: string | null
+  supplier: string | null
+  batch_code: string | null
+}
+
+export interface StickerInspectionReport {
+  present: boolean
+  status: 'PRESENT' | 'NOT_PRESENT'
+  notification: string
+  confidence: number
+  fields: StickerFieldData
+  thumbnail: string | null
+}
+
 export interface InspectionReportResponse {
   report_id: string
   inspection_id: string
@@ -40,5 +60,6 @@ export interface InspectionReportResponse {
   annotated_image: string
   checkpoint_results: MockCheckpointResult[]
   branch_measurements: ReportBranchMeasurement[]
+  sticker_inspection: StickerInspectionReport
   disclaimer: string
 }

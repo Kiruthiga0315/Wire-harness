@@ -12,7 +12,12 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.models import Checkpoint, ProductModel
-from app.schemas.report import InspectionReportResponse, ReportBranchMeasurement
+from app.schemas.report import (
+    InspectionReportResponse,
+    ReportBranchMeasurement,
+    StickerFieldData,
+    StickerInspectionReport,
+)
 from app.services.active_image_service import (
     DEMO_IMAGE_LOGICAL_NAME,
     active_image_service,
@@ -20,6 +25,7 @@ from app.services.active_image_service import (
 )
 from app.services.harness_segmentation_service import ImageArray
 from app.services.reporting_service import InspectionReportResult, ReportingService
+from app.services.pdf_report_service import pdf_report_service
 
 router = APIRouter(prefix="/reports", tags=["Reports"])
 reporting_service = ReportingService()
@@ -61,7 +67,7 @@ def _generate_demo_report(db: Session) -> tuple[ProductModel, InspectionReportRe
 @router.get(
     "/demo",
     response_model=InspectionReportResponse,
-    summary="Generate the complete demonstration inspection report",
+    summary="Generate the complete demonstration inspection report with sticker verification",
 )
 def get_demo_report(db: Session = Depends(get_db)) -> InspectionReportResponse:
     model, report = _generate_demo_report(db)
@@ -77,6 +83,7 @@ def get_demo_report(db: Session = Depends(get_db)) -> InspectionReportResponse:
             pixels_per_cm = round(float(ppm) * 10.0, 4)
     except Exception:
         pass
+    sticker = report.sticker
 
     return InspectionReportResponse(
         report_id=report.report_id,
@@ -86,10 +93,10 @@ def get_demo_report(db: Session = Depends(get_db)) -> InspectionReportResponse:
         model_name=model.model_name,
         revision=model.revision,
         work_order="WO-DEMO-001",
-        barcode="DEMO-WH-001",
+        barcode=sticker.fields.barcode_payload or "DEMO-WH-001",
         operator="Development",
         source_image=active.filename,
-        overall_result=inspection.state,
+        overall_result=inspection.state if sticker.present else "NG",
         total_checkpoints=inspection.total_checkpoints,
         passed=inspection.passed,
         failed=inspection.failed,
@@ -116,9 +123,26 @@ def get_demo_report(db: Session = Depends(get_db)) -> InspectionReportResponse:
             orientation_degrees=branch.orientation_degrees,
             unit="cm",
         ) for branch in graph.branches],
+        sticker_inspection=StickerInspectionReport(
+            present=sticker.present,
+            status=sticker.status,  # "PRESENT" or "NOT_PRESENT"
+            notification=sticker.notification,
+            confidence=sticker.confidence,
+            fields=StickerFieldData(
+                harness_code=sticker.fields.harness_code,
+                part_number=sticker.fields.part_number,
+                description=sticker.fields.description,
+                drawing_number=sticker.fields.drawing_number,
+                serial_number=sticker.fields.serial_number,
+                barcode_payload=sticker.fields.barcode_payload,
+                supplier=sticker.fields.supplier,
+                batch_code=sticker.fields.batch_code,
+            ),
+            thumbnail=sticker.thumbnail_data_url,
+        ),
         disclaimer=(
-            "Development report generated from deterministic checkpoint results and calibrated "
-            f"OpenCV metric topology (1 cm ≈ {pixels_per_cm:.2f} px)."
+            "Quality report with automated specification sticker verification and OCR traceability. "
+            f"Calibrated OpenCV metric topology (1 cm ≈ {pixels_per_cm:.2f} px)."
         ),
     )
 
@@ -144,9 +168,30 @@ def export_demo_report_csv(db: Session = Depends(get_db)) -> Response:
         "straight_distance_cm", "orientation_deg",
     ])
     writer.writerow([
-        "SUMMARY", report.report_id, model.model_name, report.inspection.state, "", "", "", "",
+        "SUMMARY", report.report_id, model.model_name,
+        report.inspection.state if report.sticker.present else "NG", "", "", "", "",
         "", "", f"{(report.graph.total_wire_length_pixels / pixels_per_cm):.2f}", "", "",
     ])
+    # Sticker record
+    stk = report.sticker
+    writer.writerow([
+        "STICKER_INSPECTION", "STICKER-01", stk.notification, stk.status,
+        "PRESENT", stk.status, "", f"{stk.confidence:.3f}", "", "", "", "", "",
+    ])
+    if stk.present:
+        for k, v in [
+            ("HARNESS_CODE", stk.fields.harness_code),
+            ("PART_NUMBER", stk.fields.part_number),
+            ("DESCRIPTION", stk.fields.description),
+            ("DRAWING_NUMBER", stk.fields.drawing_number),
+            ("SERIAL_NUMBER", stk.fields.serial_number),
+            ("BARCODE_PAYLOAD", stk.fields.barcode_payload),
+            ("SUPPLIER", stk.fields.supplier),
+            ("BATCH_CODE", stk.fields.batch_code),
+        ]:
+            if v:
+                writer.writerow(["STICKER_FIELD", k, v, "EXTRACTED", "", "", "", "1.000", "", "", "", "", ""])
+
     for result in report.inspection.results:
         writer.writerow([
             "CHECKPOINT", result.checkpoint_id, result.checkpoint_name, result.status,
@@ -165,5 +210,17 @@ def export_demo_report_csv(db: Session = Depends(get_db)) -> Response:
     return Response(
         content=output.getvalue().encode("utf-8-sig"),
         media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/demo/export.pdf", summary="Export the complete inspection report as PDF")
+def export_demo_report_pdf(db: Session = Depends(get_db)) -> Response:
+    report_response = get_demo_report(db)
+    pdf_bytes = pdf_report_service.generate_pdf(report_response)
+    filename = f"{report_response.report_id}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )

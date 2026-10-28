@@ -12,3 +12,7 @@ Pillow>=10.4,<13.0
 
 # Future AI integration placeholder (not installed or used yet):
 # ultralytics>=8.3
+
+rapidocr-onnxruntime>=1.4.0
+zxing-cpp>=3.0.0
+reportlab>=5.0.0
