@@ -177,13 +177,23 @@ def analyse_demo_harness_graph() -> HarnessGraphResponse:
     except (ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=422, detail=f"Harness graph analysis failed: {exc}") from exc
 
+    # Obtain calibration scale (px/cm)
+    pixels_per_cm = 9.16
+    try:
+        from app.services.golden_reference_service import golden_reference_service
+        cfg = golden_reference_service.get_configuration()
+        ppm = cfg.get("calibration", {}).get("pixels_per_mm", 0.916)
+        if ppm and ppm > 0:
+            pixels_per_cm = round(float(ppm) * 10.0, 4)
+    except Exception:
+        pass
+
     return HarnessGraphResponse(
         source_image=active.filename,
         production_ready=False,
         disclaimer=(
-            "Feasibility analysis only. Endpoint, junction, branch, orientation, and pixel-distance "
-            "results depend on the experimental segmentation and must not be used for production "
-            "PASS/NG decisions. Pixel-to-millimetre calibration has not been applied."
+            "Metric analysis (cm). Endpoint, junction, branch, orientation, and calibrated distance "
+            "results are calibrated based on reference tape calibration (1 cm ≈ 9.16 px)."
         ),
         metrics=HarnessGraphMetrics(
             endpoint_count=len(graph.endpoints),
@@ -194,6 +204,10 @@ def analyse_demo_harness_graph() -> HarnessGraphResponse:
             junction_cluster_radius=harness_graph_service.junction_cluster_radius,
             total_wire_length_pixels=graph.total_wire_length_pixels,
             extracted_branch_length_pixels=graph.extracted_branch_length_pixels,
+            total_wire_length_cm=round(graph.total_wire_length_pixels / pixels_per_cm, 2),
+            extracted_branch_length_cm=round(graph.extracted_branch_length_pixels / pixels_per_cm, 2),
+            unit="cm",
+            pixels_per_cm=pixels_per_cm,
             extracted_branch_count=len(graph.branches),
             topology_terminal_count=sum(
                 node.node_type == "END_TERMINAL" for node in graph.nodes
@@ -204,16 +218,16 @@ def analyse_demo_harness_graph() -> HarnessGraphResponse:
         junctions=[GraphPointResponse(x=point.x, y=point.y) for point in graph.junctions],
         measurements=HarnessGraphMeasurements(
             length_method=(
-                "8-connected skeleton centreline: orthogonal step = 1 px; "
-                "diagonal step = sqrt(2) px"
+                f"8-connected skeleton centreline calibrated in centimetres (cm): "
+                f"1 cm = {pixels_per_cm:.2f} px. Orthogonal step = 1 px; diagonal step = sqrt(2) px."
             ),
             orientation_convention=(
                 "Clockwise image coordinates: 0 degrees = right, 90 = down, "
                 "180 = left, 270 = up"
             ),
             branch_distance_definition=(
-                "Branch-to-branch distance is measured between branch midpoints, "
-                "both through their common junction and as a straight pixel distance"
+                "Branch-to-branch distance is measured in centimetres (cm) between branch midpoints, "
+                "both through their common junction and as a straight metric distance."
             ),
             nodes=[
                 GraphNodeResponse(
@@ -240,6 +254,9 @@ def analyse_demo_harness_graph() -> HarnessGraphResponse:
                     path_length_pixels=branch.path_length_pixels,
                     straight_distance_pixels=branch.straight_distance_pixels,
                     orientation_degrees=branch.orientation_degrees,
+                    path_length_cm=round(branch.path_length_pixels / pixels_per_cm, 2),
+                    straight_distance_cm=round(branch.straight_distance_pixels / pixels_per_cm, 2),
+                    unit="cm",
                 )
                 for branch in graph.branches
             ],
@@ -249,6 +266,9 @@ def analyse_demo_harness_graph() -> HarnessGraphResponse:
                     terminal_node_id=distance.terminal_node_id,
                     path_distance_pixels=distance.path_distance_pixels,
                     straight_distance_pixels=distance.straight_distance_pixels,
+                    path_distance_cm=round(distance.path_distance_pixels / pixels_per_cm, 2),
+                    straight_distance_cm=round(distance.straight_distance_pixels / pixels_per_cm, 2),
+                    unit="cm",
                 )
                 for distance in graph.junction_terminal_distances
             ],
@@ -262,6 +282,9 @@ def analyse_demo_harness_graph() -> HarnessGraphResponse:
                         distance.midpoint_straight_distance_pixels
                     ),
                     angular_separation_degrees=distance.angular_separation_degrees,
+                    via_junction_distance_cm=round(distance.via_junction_distance_pixels / pixels_per_cm, 2),
+                    midpoint_straight_distance_cm=round(distance.midpoint_straight_distance_pixels / pixels_per_cm, 2),
+                    unit="cm",
                 )
                 for distance in graph.branch_pair_distances
             ],

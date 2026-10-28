@@ -5,7 +5,10 @@ import { runHarnessGraphAnalysis } from '../services/api'
 import type { HarnessGraphResponse } from '../types/engineering'
 import { StatusPill } from './StatusPill'
 
-const px = (value: number) => `${value.toFixed(1)} px`
+const cm = (pixels: number, ppm: number = 9.16) => {
+  const val = pixels / (ppm > 0 ? ppm : 9.16)
+  return `${val.toFixed(1)} cm`
+}
 const degrees = (value: number) => `${value.toFixed(1)}°`
 
 export function HarnessGraphPanel() {
@@ -32,25 +35,26 @@ export function HarnessGraphPanel() {
   }
 
   const junctionNodes = result?.measurements.nodes.filter((node) => node.node_type === 'JUNCTION') ?? []
+  const ppm = result?.metrics.pixels_per_cm ?? 9.16
 
   return (
     <section className="panel graph-analysis-panel">
-      <div className="panel-header"><div><p className="eyebrow">TOPOLOGY & PIXEL MEASUREMENT FEASIBILITY</p><h2>Experimental Harness Graph</h2></div><div className="graph-header-actions"><StatusPill tone="warning">NOT FOR PASS / NG</StatusPill><button className="button button--primary" onClick={() => void analyseGraph()} disabled={processing}><Play size={17} />{processing ? 'Analysing…' : result ? 'Run again' : 'Run graph analysis'}</button></div></div>
+      <div className="panel-header"><div><p className="eyebrow">TOPOLOGY & METRIC MEASUREMENT (cm)</p><h2>Experimental Harness Graph</h2></div><div className="graph-header-actions"><StatusPill tone="warning">NOT FOR PASS / NG</StatusPill><button className="button button--primary" onClick={() => void analyseGraph()} disabled={processing}><Play size={17} />{processing ? 'Analysing…' : result ? 'Run again' : 'Run graph analysis'}</button></div></div>
 
-      <div className="graph-method-strip"><Network size={18} /><span>Skeletonize mask → extract nodes and branches → calculate weighted pixel paths, graph distances, junction degree and orientation</span></div>
+      <div className="graph-method-strip"><Network size={18} /><span>Skeletonize mask → extract nodes and branches → calculate calibrated metric (cm) paths, graph distances, junction degree and orientation</span></div>
       {error && <div className="checkpoint-form-error" role="alert">{error}</div>}
 
       {!result ? (
-        <div className="graph-empty"><GitBranch size={36} /><strong>{processing ? 'ANALYSING SKELETON TOPOLOGY…' : 'GRAPH ANALYSIS NOT RUN'}</strong><span>Run the feasibility analysis to calculate topology and pixel measurements.</span></div>
+        <div className="graph-empty"><GitBranch size={36} /><strong>{processing ? 'ANALYSING SKELETON TOPOLOGY…' : 'GRAPH ANALYSIS NOT RUN'}</strong><span>Run the feasibility analysis to calculate topology and metric (cm) measurements.</span></div>
       ) : (
         <>
           <div className="graph-metrics graph-metrics--measurements">
-            <article><span>Total wire centreline</span><strong>{px(result.metrics.total_wire_length_pixels)}</strong><small>All weighted skeleton steps</small></article>
-            <article><span>Extracted branches</span><strong>{result.metrics.extracted_branch_count}</strong><small>{px(result.metrics.extracted_branch_length_pixels)} combined</small></article>
+            <article><span>Total wire centreline</span><strong>{cm(result.metrics.total_wire_length_pixels, ppm)}</strong><small>Calibrated metric length</small></article>
+            <article><span>Extracted branches</span><strong>{result.metrics.extracted_branch_count}</strong><small>{cm(result.metrics.extracted_branch_length_pixels, ppm)} combined</small></article>
             <article><span>Junctions / terminals</span><strong>{result.metrics.clustered_junction_count} / {result.metrics.topology_terminal_count}</strong><small>Clustered nodes / usable endpoints</small></article>
             <article><span>Unresolved segments</span><strong>{result.metrics.unresolved_segment_count}</strong><small>Excluded from node distances</small></article>
             <article><span>Skeleton pixels</span><strong>{result.metrics.skeleton_pixel_count.toLocaleString()}</strong><small>One-pixel representation</small></article>
-            <article><span>Connectivity / radius</span><strong>{result.metrics.neighbour_connectivity} / {result.metrics.junction_cluster_radius}px</strong><small>Neighbourhood configuration</small></article>
+            <article><span>Connectivity / scale</span><strong>{result.metrics.neighbour_connectivity} / {ppm.toFixed(2)} px/cm</strong><small>Metric calibration ratio</small></article>
           </div>
 
           <div className="graph-visual-grid">
@@ -60,7 +64,7 @@ export function HarnessGraphPanel() {
 
           <div className="graph-measurement-notes">
             <Ruler size={18} />
-            <div><strong>PIXEL MEASUREMENT DEFINITIONS</strong><span>{result.measurements.length_method}. {result.measurements.orientation_convention}. {result.measurements.branch_distance_definition}.</span></div>
+            <div><strong>METRIC MEASUREMENT DEFINITIONS (cm)</strong><span>{result.measurements.length_method}. {result.measurements.orientation_convention}. {result.measurements.branch_distance_definition}.</span></div>
           </div>
 
           <div className="graph-table-grid">
@@ -71,20 +75,20 @@ export function HarnessGraphPanel() {
             </MeasurementTable>
 
             <MeasurementTable title="Node-to-node distances" subtitle={`${result.measurements.node_to_node_distances.length} resolved branches`}>
-              <table><thead><tr><th>Branch</th><th>Nodes</th><th>Path</th><th>Straight</th><th>Orientation</th></tr></thead><tbody>
-                {result.measurements.node_to_node_distances.map((item) => <tr key={item.branch_id}><td><strong>{item.branch_id}</strong></td><td>{item.source_node_id} → {item.target_node_id}</td><td>{px(item.path_length_pixels)}</td><td>{px(item.straight_distance_pixels)}</td><td>{degrees(item.orientation_degrees)}</td></tr>)}
+              <table><thead><tr><th>Branch</th><th>Nodes</th><th>Path (cm)</th><th>Straight (cm)</th><th>Orientation</th></tr></thead><tbody>
+                {result.measurements.node_to_node_distances.map((item) => <tr key={item.branch_id}><td><strong>{item.branch_id}</strong></td><td>{item.source_node_id} → {item.target_node_id}</td><td>{cm(item.path_length_pixels, ppm)}</td><td>{cm(item.straight_distance_pixels, ppm)}</td><td>{degrees(item.orientation_degrees)}</td></tr>)}
               </tbody></table>
             </MeasurementTable>
 
             <MeasurementTable title="Junction-to-end-terminal" subtitle="Nearest reachable terminal per junction">
-              <table><thead><tr><th>Junction</th><th>Terminal</th><th>Graph path</th><th>Straight</th></tr></thead><tbody>
-                {result.measurements.nearest_junction_to_terminal_distances.map((item) => <tr key={item.junction_node_id}><td><strong>{item.junction_node_id}</strong></td><td>{item.terminal_node_id}</td><td>{px(item.path_distance_pixels)}</td><td>{px(item.straight_distance_pixels)}</td></tr>)}
+              <table><thead><tr><th>Junction</th><th>Terminal</th><th>Graph path (cm)</th><th>Straight (cm)</th></tr></thead><tbody>
+                {result.measurements.nearest_junction_to_terminal_distances.map((item) => <tr key={item.junction_node_id}><td><strong>{item.junction_node_id}</strong></td><td>{item.terminal_node_id}</td><td>{cm(item.path_distance_pixels, ppm)}</td><td>{cm(item.straight_distance_pixels, ppm)}</td></tr>)}
               </tbody></table>
             </MeasurementTable>
 
             <MeasurementTable title="Branch-to-branch distances" subtitle="Incident branch midpoint pairs">
-              <table><thead><tr><th>Junction</th><th>Branch pair</th><th>Via junction</th><th>Straight</th><th>Angle gap</th></tr></thead><tbody>
-                {result.measurements.branch_to_branch_distances.map((item) => <tr key={`${item.junction_node_id}-${item.first_branch_id}-${item.second_branch_id}`}><td><strong>{item.junction_node_id}</strong></td><td>{item.first_branch_id} ↔ {item.second_branch_id}</td><td>{px(item.via_junction_distance_pixels)}</td><td>{px(item.midpoint_straight_distance_pixels)}</td><td>{degrees(item.angular_separation_degrees)}</td></tr>)}
+              <table><thead><tr><th>Junction</th><th>Branch pair</th><th>Via junction (cm)</th><th>Straight (cm)</th><th>Angle gap</th></tr></thead><tbody>
+                {result.measurements.branch_to_branch_distances.map((item) => <tr key={`${item.junction_node_id}-${item.first_branch_id}-${item.second_branch_id}`}><td><strong>{item.junction_node_id}</strong></td><td>{item.first_branch_id} ↔ {item.second_branch_id}</td><td>{cm(item.via_junction_distance_pixels, ppm)}</td><td>{cm(item.midpoint_straight_distance_pixels, ppm)}</td><td>{degrees(item.angular_separation_degrees)}</td></tr>)}
               </tbody></table>
             </MeasurementTable>
           </div>
@@ -103,7 +107,7 @@ export function HarnessGraphPanel() {
 function MeasurementTable({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
   return (
     <article className="graph-measurement-table">
-      <header><div><p className="eyebrow">PIXEL RESULTS</p><h3>{title}</h3></div><span>{subtitle}</span></header>
+      <header><div><p className="eyebrow">METRIC RESULTS (cm)</p><h3>{title}</h3></div><span>{subtitle}</span></header>
       <div className="graph-table-scroll">{children}</div>
     </article>
   )

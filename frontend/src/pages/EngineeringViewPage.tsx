@@ -82,7 +82,7 @@ export function EngineeringViewPage() {
       <PageHeader
         eyebrow="VISION ENGINEERING"
         title="Engineering View"
-        description="Configure pixel checkpoints and inspect intermediate computer-vision outputs."
+        description="Configure checkpoints and inspect intermediate computer-vision metric outputs (cm)."
         actions={
           <div className="button-group">
             <input

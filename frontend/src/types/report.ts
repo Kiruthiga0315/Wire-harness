@@ -7,6 +7,9 @@ export interface ReportBranchMeasurement {
   path_length_pixels: number
   straight_distance_pixels: number
   orientation_degrees: number
+  path_length_cm?: number
+  straight_distance_cm?: number
+  unit?: string
 }
 
 export interface InspectionReportResponse {
@@ -27,6 +30,9 @@ export interface InspectionReportResponse {
   warnings: number
   cycle_time_seconds: number
   total_wire_length_pixels: number
+  total_wire_length_cm?: number
+  pixels_per_cm?: number
+  unit?: string
   extracted_branch_count: number
   clustered_junction_count: number
   terminal_count: number

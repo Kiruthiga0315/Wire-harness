@@ -13,6 +13,9 @@ class ReportBranchMeasurement(BaseModel):
     path_length_pixels: float = Field(ge=0)
     straight_distance_pixels: float = Field(ge=0)
     orientation_degrees: float = Field(ge=0, lt=360)
+    path_length_cm: float | None = None
+    straight_distance_cm: float | None = None
+    unit: str = "cm"
 
 
 class InspectionReportResponse(BaseModel):
@@ -33,6 +36,9 @@ class InspectionReportResponse(BaseModel):
     warnings: int = Field(ge=0)
     cycle_time_seconds: float = Field(ge=0)
     total_wire_length_pixels: float = Field(ge=0)
+    total_wire_length_cm: float | None = None
+    unit: str = "cm"
+    pixels_per_cm: float = 9.16
     extracted_branch_count: int = Field(ge=0)
     clustered_junction_count: int = Field(ge=0)
     terminal_count: int = Field(ge=0)

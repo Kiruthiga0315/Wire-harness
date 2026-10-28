@@ -41,6 +41,10 @@ export interface HarnessGraphResponse {
     junction_cluster_radius: number
     total_wire_length_pixels: number
     extracted_branch_length_pixels: number
+    total_wire_length_cm?: number
+    extracted_branch_length_cm?: number
+    pixels_per_cm?: number
+    unit?: string
     extracted_branch_count: number
     topology_terminal_count: number
     unresolved_segment_count: number

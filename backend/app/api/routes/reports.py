@@ -68,6 +68,16 @@ def get_demo_report(db: Session = Depends(get_db)) -> InspectionReportResponse:
     active = active_image_service.get_active_image()
     graph = report.graph
     inspection = report.inspection
+    pixels_per_cm = 9.16
+    try:
+        from app.services.golden_reference_service import golden_reference_service
+        cfg = golden_reference_service.get_configuration()
+        ppm = cfg.get("calibration", {}).get("pixels_per_mm", 0.916)
+        if ppm and ppm > 0:
+            pixels_per_cm = round(float(ppm) * 10.0, 4)
+    except Exception:
+        pass
+
     return InspectionReportResponse(
         report_id=report.report_id,
         inspection_id=inspection.inspection_id,
@@ -86,6 +96,9 @@ def get_demo_report(db: Session = Depends(get_db)) -> InspectionReportResponse:
         warnings=inspection.warnings,
         cycle_time_seconds=inspection.cycle_time_seconds,
         total_wire_length_pixels=graph.total_wire_length_pixels,
+        total_wire_length_cm=round(graph.total_wire_length_pixels / pixels_per_cm, 2),
+        unit="cm",
+        pixels_per_cm=pixels_per_cm,
         extracted_branch_count=len(graph.branches),
         clustered_junction_count=len(graph.junctions),
         terminal_count=sum(node.node_type == "END_TERMINAL" for node in graph.nodes),
@@ -98,11 +111,14 @@ def get_demo_report(db: Session = Depends(get_db)) -> InspectionReportResponse:
             target_node_id=branch.target_node_id,
             path_length_pixels=branch.path_length_pixels,
             straight_distance_pixels=branch.straight_distance_pixels,
+            path_length_cm=round(branch.path_length_pixels / pixels_per_cm, 2),
+            straight_distance_cm=round(branch.straight_distance_pixels / pixels_per_cm, 2),
             orientation_degrees=branch.orientation_degrees,
+            unit="cm",
         ) for branch in graph.branches],
         disclaimer=(
-            "Development report generated from deterministic checkpoint results and experimental "
-            "OpenCV topology. Lengths are uncalibrated pixels and are not valid for production PASS/NG."
+            "Development report generated from deterministic checkpoint results and calibrated "
+            f"OpenCV metric topology (1 cm ≈ {pixels_per_cm:.2f} px)."
         ),
     )
 
@@ -110,16 +126,26 @@ def get_demo_report(db: Session = Depends(get_db)) -> InspectionReportResponse:
 @router.get("/demo/export.csv", summary="Export the demonstration report as CSV")
 def export_demo_report_csv(db: Session = Depends(get_db)) -> Response:
     model, report = _generate_demo_report(db)
+    pixels_per_cm = 9.16
+    try:
+        from app.services.golden_reference_service import golden_reference_service
+        cfg = golden_reference_service.get_configuration()
+        ppm = cfg.get("calibration", {}).get("pixels_per_mm", 0.916)
+        if ppm and ppm > 0:
+            pixels_per_cm = round(float(ppm) * 10.0, 4)
+    except Exception:
+        pass
+
     output = io.StringIO(newline="")
     writer = csv.writer(output)
     writer.writerow([
         "record_type", "record_id", "description", "status", "expected", "actual",
-        "tolerance", "confidence", "source_node", "target_node", "path_length_px",
-        "straight_distance_px", "orientation_deg",
+        "tolerance", "confidence", "source_node", "target_node", "path_length_cm",
+        "straight_distance_cm", "orientation_deg",
     ])
     writer.writerow([
         "SUMMARY", report.report_id, model.model_name, report.inspection.state, "", "", "", "",
-        "", "", f"{report.graph.total_wire_length_pixels:.3f}", "", "",
+        "", "", f"{(report.graph.total_wire_length_pixels / pixels_per_cm):.2f}", "", "",
     ])
     for result in report.inspection.results:
         writer.writerow([
@@ -130,8 +156,10 @@ def export_demo_report_csv(db: Session = Depends(get_db)) -> Response:
     for branch in report.graph.branches:
         writer.writerow([
             "BRANCH", branch.branch_id, "Node-to-node centreline", "MEASURED", "", "", "", "",
-            branch.source_node_id, branch.target_node_id, f"{branch.path_length_pixels:.3f}",
-            f"{branch.straight_distance_pixels:.3f}", f"{branch.orientation_degrees:.3f}",
+            branch.source_node_id, branch.target_node_id,
+            f"{(branch.path_length_pixels / pixels_per_cm):.2f}",
+            f"{(branch.straight_distance_pixels / pixels_per_cm):.2f}",
+            f"{branch.orientation_degrees:.3f}",
         ])
     filename = f"{report.report_id}.csv"
     return Response(

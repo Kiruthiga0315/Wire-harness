@@ -20,6 +20,10 @@ class HarnessGraphMetrics(BaseModel):
     junction_cluster_radius: int = Field(gt=0)
     total_wire_length_pixels: float = Field(ge=0)
     extracted_branch_length_pixels: float = Field(ge=0)
+    total_wire_length_cm: float | None = None
+    extracted_branch_length_cm: float | None = None
+    unit: str = "cm"
+    pixels_per_cm: float = 9.16
     extracted_branch_count: int = Field(ge=0)
     topology_terminal_count: int = Field(ge=0)
     unresolved_segment_count: int = Field(ge=0)
@@ -46,6 +50,9 @@ class GraphBranchResponse(BaseModel):
     path_length_pixels: float = Field(ge=0)
     straight_distance_pixels: float = Field(ge=0)
     orientation_degrees: float = Field(ge=0, lt=360)
+    path_length_cm: float | None = None
+    straight_distance_cm: float | None = None
+    unit: str = "cm"
 
 
 class JunctionTerminalDistanceResponse(BaseModel):
@@ -53,6 +60,9 @@ class JunctionTerminalDistanceResponse(BaseModel):
     terminal_node_id: str
     path_distance_pixels: float = Field(ge=0)
     straight_distance_pixels: float = Field(ge=0)
+    path_distance_cm: float | None = None
+    straight_distance_cm: float | None = None
+    unit: str = "cm"
 
 
 class BranchPairDistanceResponse(BaseModel):
@@ -62,6 +72,9 @@ class BranchPairDistanceResponse(BaseModel):
     via_junction_distance_pixels: float = Field(ge=0)
     midpoint_straight_distance_pixels: float = Field(ge=0)
     angular_separation_degrees: float = Field(ge=0, le=180)
+    via_junction_distance_cm: float | None = None
+    midpoint_straight_distance_cm: float | None = None
+    unit: str = "cm"
 
 
 class HarnessGraphMeasurements(BaseModel):

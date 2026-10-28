@@ -8,7 +8,10 @@ import type { InspectionReportResponse } from '../types/report'
 
 type StatusFilter = 'ALL' | 'PASS' | 'NG'
 
-const px = (value: number) => `${value.toFixed(1)} px`
+const cm = (pixels: number, pixelsPerCm: number = 9.16) => {
+  const val = pixels / (pixelsPerCm > 0 ? pixelsPerCm : 9.16)
+  return `${val.toFixed(1)} cm`
+}
 const degrees = (value: number) => `${value.toFixed(1)}°`
 
 export function ReportsPage() {
@@ -66,12 +69,14 @@ export function ReportsPage() {
     }
   }
 
+  const ppm = report?.pixels_per_cm ?? 9.16
+
   return (
     <>
       <PageHeader
         eyebrow="QUALITY RECORDS"
         title="Inspection Report"
-        description="Review checkpoint evidence and experimental pixel measurements for the demo harness."
+        description="Review checkpoint evidence and calibrated metric (cm) measurements for the demo harness."
         actions={<button className="button button--primary" onClick={() => void loadReport()} disabled={loading}><RefreshCw size={18} className={loading ? 'spin' : ''} />{loading ? 'Generating…' : 'Regenerate report'}</button>}
       />
 
@@ -90,7 +95,7 @@ export function ReportsPage() {
 
           <section className="report-summary-grid">
             <article className={`report-result-card report-result-card--${report.overall_result.toLowerCase()}`}><span>OVERALL RESULT</span><strong>{report.overall_result}</strong><small>{report.passed} PASS · {report.failed} NG · {report.total_checkpoints} TOTAL</small></article>
-            <article><span>Total wire centreline</span><strong>{px(report.total_wire_length_pixels)}</strong><small>Weighted 8-connected skeleton</small></article>
+            <article><span>Total wire centreline</span><strong>{cm(report.total_wire_length_pixels, ppm)}</strong><small>Calibrated metric length</small></article>
             <article><span>Resolved branches</span><strong>{report.extracted_branch_count}</strong><small>Node-to-node paths</small></article>
             <article><span>Junctions / terminals</span><strong>{report.clustered_junction_count} / {report.terminal_count}</strong><small>Experimental topology nodes</small></article>
             <article><span>Cycle time</span><strong>{report.cycle_time_seconds.toFixed(1)} s</strong><small>{report.unresolved_segment_count} unresolved segment</small></article>
@@ -98,9 +103,9 @@ export function ReportsPage() {
 
           <section className="report-overview-grid">
             <article className="panel report-image-panel">
-              <div className="panel-header"><div><p className="eyebrow">ANNOTATED MEASUREMENT EVIDENCE</p><h2>Harness length image</h2></div><StatusPill tone="warning">PIXELS · UNCALIBRATED</StatusPill></div>
-              <div className="report-image-stage"><img src={report.annotated_image} alt={`Annotated harness showing total wire centreline length ${px(report.total_wire_length_pixels)}`} /></div>
-              <footer><span>Cyan path: extracted centreline · Yellow labels: longest resolved branches</span><strong>Total: {px(report.total_wire_length_pixels)}</strong></footer>
+              <div className="panel-header"><div><p className="eyebrow">ANNOTATED MEASUREMENT EVIDENCE</p><h2>Harness length image</h2></div><StatusPill tone="pass">METRIC · CALIBRATED (cm)</StatusPill></div>
+              <div className="report-image-stage"><img src={report.annotated_image} alt={`Annotated harness showing total wire centreline length ${cm(report.total_wire_length_pixels, ppm)}`} /></div>
+              <footer><span>Cyan path: extracted centreline · Yellow labels: longest resolved branches</span><strong>Total: {cm(report.total_wire_length_pixels, ppm)}</strong></footer>
             </article>
 
             <aside className="panel report-identity-panel">
@@ -130,9 +135,9 @@ export function ReportsPage() {
           </section>
 
           <section className="panel report-table-panel">
-            <div className="panel-header"><div><p className="eyebrow">DIMENSIONAL EVIDENCE</p><h2>Node-to-node branch lengths</h2></div><span className="report-row-count">{report.branch_measurements.length} BRANCHES</span></div>
-            <div className="report-table-scroll report-table-scroll--branches"><table><thead><tr><th>Branch</th><th>Source node</th><th>Target node</th><th>Path length</th><th>Straight distance</th><th>Orientation</th></tr></thead><tbody>
-              {report.branch_measurements.map((branch) => <tr key={branch.branch_id}><td><strong>{branch.branch_id}</strong></td><td>{branch.source_node_id}</td><td>{branch.target_node_id}</td><td>{px(branch.path_length_pixels)}</td><td>{px(branch.straight_distance_pixels)}</td><td>{degrees(branch.orientation_degrees)}</td></tr>)}
+            <div className="panel-header"><div><p className="eyebrow">DIMENSIONAL EVIDENCE (cm)</p><h2>Node-to-node branch lengths</h2></div><span className="report-row-count">{report.branch_measurements.length} BRANCHES</span></div>
+            <div className="report-table-scroll report-table-scroll--branches"><table><thead><tr><th>Branch</th><th>Source node</th><th>Target node</th><th>Path length (cm)</th><th>Straight distance (cm)</th><th>Orientation</th></tr></thead><tbody>
+              {report.branch_measurements.map((branch) => <tr key={branch.branch_id}><td><strong>{branch.branch_id}</strong></td><td>{branch.source_node_id}</td><td>{branch.target_node_id}</td><td>{cm(branch.path_length_pixels, ppm)}</td><td>{cm(branch.straight_distance_pixels, ppm)}</td><td>{degrees(branch.orientation_degrees)}</td></tr>)}
             </tbody></table></div>
           </section>
         </div>

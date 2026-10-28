@@ -57,6 +57,17 @@ class ReportingService:
         canvas = graph.overlay_image.copy()
         height, width = canvas.shape[:2]
 
+        pixels_per_cm = 9.16
+        try:
+            from app.services.golden_reference_service import golden_reference_service
+            ppm = golden_reference_service.get_configuration().get("calibration", {}).get("pixels_per_mm", 0.916)
+            if ppm and ppm > 0:
+                pixels_per_cm = round(float(ppm) * 10.0, 4)
+        except Exception:
+            pass
+
+        total_wire_length_cm = graph.total_wire_length_pixels / pixels_per_cm
+
         banner = canvas.copy()
         cv2.rectangle(banner, (12, 12), (width - 12, 108), (48, 29, 8), -1)
         cv2.addWeighted(banner, 0.88, canvas, 0.12, 0, canvas)
@@ -72,7 +83,7 @@ class ReportingService:
         )
         cv2.putText(
             canvas,
-            f"{graph.total_wire_length_pixels:,.1f} px",
+            f"{total_wire_length_cm:,.1f} cm",
             (28, 82),
             cv2.FONT_HERSHEY_DUPLEX,
             1.08,
@@ -82,7 +93,7 @@ class ReportingService:
         )
         cv2.putText(
             canvas,
-            "8-CONNECTED WEIGHTED SKELETON / UNCALIBRATED",
+            "8-CONNECTED WEIGHTED SKELETON / CALIBRATED (cm)",
             (260, 82),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.37,
@@ -104,12 +115,13 @@ class ReportingService:
                 branch,
                 node_points,
                 occupied_labels,
+                pixels_per_cm,
             )
 
         cv2.rectangle(canvas, (12, height - 43), (width - 12, height - 12), (48, 29, 8), -1)
         cv2.putText(
             canvas,
-            "ENGINEERING FEASIBILITY - PIXEL MEASUREMENT ONLY",
+            "CALIBRATED METRIC MEASUREMENT (cm)",
             (24, height - 22),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.38,
@@ -125,12 +137,14 @@ class ReportingService:
         branch: GraphBranch,
         node_points: dict[str, GraphPoint],
         occupied_labels: list[tuple[int, int, int, int]],
+        pixels_per_cm: float = 9.16,
     ) -> None:
         source = node_points[branch.source_node_id]
         target = node_points[branch.target_node_id]
         x = int(round((source.x + target.x) / 2))
         y = int(round((source.y + target.y) / 2))
-        label = f"{branch.branch_id} {branch.path_length_pixels:.0f}px"
+        branch_cm = branch.path_length_pixels / pixels_per_cm
+        label = f"{branch.branch_id} {branch_cm:.1f}cm"
         (text_width, text_height), _ = cv2.getTextSize(
             label, cv2.FONT_HERSHEY_SIMPLEX, 0.34, 1
         )

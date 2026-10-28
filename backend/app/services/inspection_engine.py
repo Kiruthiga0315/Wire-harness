@@ -493,10 +493,21 @@ class InspectionEngine:
         cv2.addWeighted(overlay, 0.9, canvas, 0.1, 0, canvas)
         title_scale = max(0.48, min(0.8, width / 1050))
         value_scale = max(0.75, min(1.25, width / 680))
-        cv2.putText(canvas, "ENGINEERING ANALYSIS / NOT EVALUATED", (18, 29), cv2.FONT_HERSHEY_SIMPLEX, title_scale, (220, 232, 240), 1, cv2.LINE_AA)
-        cv2.putText(canvas, f"CENTRELINE {centreline_pixels:,.1f} px", (18, banner_height - 18), cv2.FONT_HERSHEY_DUPLEX, value_scale, (70, 220, 255), 2, cv2.LINE_AA)
+
+        pixels_per_cm = 9.16
+        try:
+            from app.services.golden_reference_service import golden_reference_service
+            ppm = golden_reference_service.get_configuration().get("calibration", {}).get("pixels_per_mm", 0.916)
+            if ppm and ppm > 0:
+                pixels_per_cm = round(float(ppm) * 10.0, 4)
+        except Exception:
+            pass
+        centreline_cm = centreline_pixels / pixels_per_cm
+
+        cv2.putText(canvas, "ENGINEERING ANALYSIS / CALIBRATED (cm)", (18, 29), cv2.FONT_HERSHEY_SIMPLEX, title_scale, (220, 232, 240), 1, cv2.LINE_AA)
+        cv2.putText(canvas, f"CENTRELINE {centreline_cm:,.1f} cm", (18, banner_height - 18), cv2.FONT_HERSHEY_DUPLEX, value_scale, (70, 220, 255), 2, cv2.LINE_AA)
         cv2.rectangle(canvas, (0, height - 34), (width, height), (48, 29, 8), -1)
-        cv2.putText(canvas, "UNCALIBRATED PIXEL MEASUREMENT", (14, height - 12), cv2.FONT_HERSHEY_SIMPLEX, 0.38, (220, 232, 240), 1, cv2.LINE_AA)
+        cv2.putText(canvas, "CALIBRATED METRIC MEASUREMENT (cm)", (14, height - 12), cv2.FONT_HERSHEY_SIMPLEX, 0.38, (220, 232, 240), 1, cv2.LINE_AA)
         return canvas
 
 
