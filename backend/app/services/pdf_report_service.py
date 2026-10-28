@@ -4,19 +4,23 @@ import base64
 import io
 from pathlib import Path
 
-from reportlab.lib import colors
-from reportlab.lib.pagesizes import A4
-from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
-from reportlab.lib.units import inch
-from reportlab.platypus import (
-    HRFlowable,
-    Image as RLImage,
-    Paragraph,
-    SimpleDocTemplate,
-    Spacer,
-    Table,
-    TableStyle,
-)
+try:
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+    from reportlab.lib.units import inch
+    from reportlab.platypus import (
+        HRFlowable,
+        Image as RLImage,
+        Paragraph,
+        SimpleDocTemplate,
+        Spacer,
+        Table,
+        TableStyle,
+    )
+    REPORTLAB_AVAILABLE = True
+except ImportError:
+    REPORTLAB_AVAILABLE = False
 
 from app.schemas.report import InspectionReportResponse
 
@@ -25,6 +29,8 @@ class PdfReportService:
     """Generates focused, single-page Specification Sticker Inspection PDF reports."""
 
     def generate_pdf(self, report: InspectionReportResponse) -> bytes:
+        if not REPORTLAB_AVAILABLE:
+            raise RuntimeError("PDF generation requires 'reportlab'. Please install reportlab to export PDFs.")
         buffer = io.BytesIO()
         doc = SimpleDocTemplate(
             buffer,

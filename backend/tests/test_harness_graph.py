@@ -52,6 +52,10 @@ def test_graph_api_returns_candidate_coordinates_and_images() -> None:
     assert response.status_code == 200
     payload = response.json()
     assert payload["production_ready"] is False
+    assert payload["unit"] == "cm"
+    assert payload["pixels_per_cm"] > 0
+    assert payload["metrics"]["total_wire_length_cm"] > 0
+    assert payload["metrics"]["extracted_branch_length_cm"] > 0
     assert payload["metrics"]["endpoint_count"] == len(payload["endpoints"])
     assert payload["metrics"]["clustered_junction_count"] == len(payload["junctions"])
     assert payload["metrics"]["endpoint_count"] > 0
@@ -60,6 +64,33 @@ def test_graph_api_returns_candidate_coordinates_and_images() -> None:
     assert payload["metrics"]["extracted_branch_count"] == len(
         payload["measurements"]["node_to_node_distances"]
     )
+    first_branch = payload["measurements"]["node_to_node_distances"][0]
+    assert first_branch["path_length_cm"] > 0
+    assert first_branch["straight_distance_cm"] > 0
+    first_j_dist = payload["measurements"]["nearest_junction_to_terminal_distances"][0]
+    assert first_j_dist["path_distance_cm"] > 0
+    first_b_dist = payload["measurements"]["branch_to_branch_distances"][0]
+    assert first_b_dist["via_junction_distance_cm"] > 0
+
+    assert payload["sheet_specification"] is not None
+    assert payload["sheet_specification"]["total_terminals"] == 41
+    assert payload["sheet_specification"]["total_junctions"] == 31
+    assert payload["sheet_specification"]["total_nodes"] == 12
+    assert len(payload["sheet_specification"]["node_distances"]) == 6
+    assert len(payload["sheet_specification"]["junction_measurements"]) == 47
+
+    assert "physical_verifications" in payload
+    assert len(payload["physical_verifications"]) > 0
+    first_pv = payload["physical_verifications"][0]
+    assert first_pv["checkpoint_id"] == "CP-T01"
+    assert first_pv["expected_distance_cm"] == 39.0
+    assert first_pv["detected_distance_cm"] is not None
+    assert first_pv["status"] in ("PASS", "REVIEW", "FAIL")
+
+    assert payload["verification_summary"] is not None
+    assert payload["verification_summary"]["total_checkpoints"] == len(payload["physical_verifications"])
+    assert payload["verification_summary"]["pixels_per_cm"] > 0
+
     assert payload["measurements"]["nodes"]
     assert payload["measurements"]["nearest_junction_to_terminal_distances"]
     assert payload["measurements"]["branch_to_branch_distances"]

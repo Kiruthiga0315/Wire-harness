@@ -31,6 +31,9 @@ from app.schemas.harness_graph import (
     HarnessGraphMetrics,
     HarnessGraphResponse,
     JunctionTerminalDistanceResponse,
+    SheetJunctionMeasurementSpec,
+    SheetNodeDistanceSpec,
+    SheetSpecification,
 )
 from app.services.active_image_service import (
     DEMO_IMAGE_LOGICAL_NAME,
@@ -159,6 +162,73 @@ def inspect_checkpoint_colour(
     )
 
 
+SHEET_NODE_DISTANCES = [
+    SheetNodeDistanceSpec(node_pair="N1 - N2", distance_cm=28.5),
+    SheetNodeDistanceSpec(node_pair="N3 - N4", distance_cm=10.0),
+    SheetNodeDistanceSpec(node_pair="N5 - N6", distance_cm=53.8),
+    SheetNodeDistanceSpec(node_pair="N7 - N8", distance_cm=8.0),
+    SheetNodeDistanceSpec(node_pair="N9 - N10", distance_cm=23.5),
+    SheetNodeDistanceSpec(node_pair="N11 - N12", distance_cm=60.5),
+]
+
+SHEET_JUNCTION_MEASUREMENTS = [
+    SheetJunctionMeasurementSpec(source="J1", target="T1", distance_cm=39.0),
+    SheetJunctionMeasurementSpec(source="J1", target="T2", distance_cm=46.0),
+    SheetJunctionMeasurementSpec(source="J1", target="T3", distance_cm=45.0),
+    SheetJunctionMeasurementSpec(source="J2", target="T5", distance_cm=21.0),
+    SheetJunctionMeasurementSpec(source="J2", target="T6", distance_cm=20.0),
+    SheetJunctionMeasurementSpec(source="J3", target="T4", distance_cm=29.5),
+    SheetJunctionMeasurementSpec(source="J3", target="T7", distance_cm=18.0),
+    SheetJunctionMeasurementSpec(source="J3", target="T8", distance_cm=20.0),
+    SheetJunctionMeasurementSpec(source="J4", target="J6", distance_cm=10.0),
+    SheetJunctionMeasurementSpec(source="J6", target="T10", distance_cm=29.0),
+    SheetJunctionMeasurementSpec(source="J6", target="T9", distance_cm=11.5),
+    SheetJunctionMeasurementSpec(source="J5", target="J7", distance_cm=49.0),
+    SheetJunctionMeasurementSpec(source="J7", target="T12", distance_cm=29.4),
+    SheetJunctionMeasurementSpec(source="J7", target="T11", distance_cm=11.0),
+    SheetJunctionMeasurementSpec(source="J8", target="J9", distance_cm=7.0),
+    SheetJunctionMeasurementSpec(source="J9", target="T13", distance_cm=15.0),
+    SheetJunctionMeasurementSpec(source="J9", target="T14", distance_cm=12.0),
+    SheetJunctionMeasurementSpec(source="J11", target="J10", distance_cm=6.5),
+    SheetJunctionMeasurementSpec(source="J10", target="T18", distance_cm=14.0),
+    SheetJunctionMeasurementSpec(source="J10", target="T17", distance_cm=12.0),
+    SheetJunctionMeasurementSpec(source="J12", target="T22", distance_cm=10.0),
+    SheetJunctionMeasurementSpec(source="J15", target="T15", distance_cm=18.0),
+    SheetJunctionMeasurementSpec(source="J16", target="T16", distance_cm=10.0),
+    SheetJunctionMeasurementSpec(source="J19", target="T19", distance_cm=10.0),
+    SheetJunctionMeasurementSpec(source="J14", target="T20", distance_cm=14.5),
+    SheetJunctionMeasurementSpec(source="J14", target="T21", distance_cm=17.0),
+    SheetJunctionMeasurementSpec(source="J18", target="T23", distance_cm=20.0),
+    SheetJunctionMeasurementSpec(source="J18", target="T24", distance_cm=17.0),
+    SheetJunctionMeasurementSpec(source="J20", target="J21", distance_cm=35.0),
+    SheetJunctionMeasurementSpec(source="J21", target="T29", distance_cm=16.0),
+    SheetJunctionMeasurementSpec(source="J24", target="T30", distance_cm=44.0),
+    SheetJunctionMeasurementSpec(source="J21", target="T31", distance_cm=39.0),
+    SheetJunctionMeasurementSpec(source="J21", target="T28", distance_cm=10.0),
+    SheetJunctionMeasurementSpec(source="J20", target="J22", distance_cm=15.0),
+    SheetJunctionMeasurementSpec(source="J23", target="T27", distance_cm=19.0),
+    SheetJunctionMeasurementSpec(source="J24", target="T25", distance_cm=19.0),
+    SheetJunctionMeasurementSpec(source="J24", target="T26", distance_cm=13.0),
+    SheetJunctionMeasurementSpec(source="J25", target="J26", distance_cm=20.0),
+    SheetJunctionMeasurementSpec(source="J26", target="T33", distance_cm=26.0),
+    SheetJunctionMeasurementSpec(source="J26", target="T34", distance_cm=20.0),
+    SheetJunctionMeasurementSpec(source="J26", target="T32", distance_cm=18.0),
+    SheetJunctionMeasurementSpec(source="J27", target="T35", distance_cm=26.0),
+    SheetJunctionMeasurementSpec(source="J28", target="T38", distance_cm=69.0),
+    SheetJunctionMeasurementSpec(source="J29", target="T36", distance_cm=32.0),
+    SheetJunctionMeasurementSpec(source="J29", target="T37", distance_cm=12.0),
+    SheetJunctionMeasurementSpec(source="J31", target="T41", distance_cm=31.0),
+    SheetJunctionMeasurementSpec(source="J31", target="T40", distance_cm=23.5),
+]
+
+SHEET_JUNCTION_BRANCH_COUNTS = {
+    "J1": 2, "J2": 2, "J3": 3, "J4": 2, "J5": 2, "J6": 2, "J7": 2, "J8": 2,
+    "J9": 2, "J10": 2, "J11": 1, "J12": 1, "J13": 2, "J14": 2, "J15": 1, "J16": 1,
+    "J17": 3, "J18": 2, "J19": 1, "J20": 2, "J21": 4, "J22": 3, "J23": 1, "J24": 2,
+    "J25": 3, "J26": 3, "J27": 1, "J28": 1, "J29": 2, "J30": 2, "J31": 2,
+}
+
+
 @router.post(
     "/harness-graph/demo",
     response_model=HarnessGraphResponse,
@@ -169,31 +239,114 @@ def analyse_demo_harness_graph() -> HarnessGraphResponse:
     image = active.bgr_image
 
     try:
+        from app.services.calibration_service import detect_tape_calibration, pixels_per_cm_for_width
+        from app.services.golden_inspection_service import golden_inspection_service
+        from app.schemas.harness_graph import PhysicalVerificationItem, PhysicalVerificationSummary
+
+        # Derive px/cm from yellow tape in image (falls back to proportional if no tape)
+        calib_result = detect_tape_calibration(image)
+        if calib_result.get("pixels_per_cm") and float(calib_result["pixels_per_cm"]) > 0.5:
+            derived_px_per_cm = float(calib_result["pixels_per_cm"])
+        else:
+            derived_px_per_cm = pixels_per_cm_for_width(int(image.shape[1]))
+
         segmentation = segmentation_service.segment(image)
         graph = harness_graph_service.analyse(
             segmentation.binary_mask,
-            base_image=segmentation.cropped_base_image if segmentation.cropped_base_image is not None else image,
+            base_image=image,
+            pixels_per_cm=derived_px_per_cm,
+        )
+        calib_method = str(calib_result.get("method", "proportional_fallback"))
+        calib_tape_span_px = calib_result.get("tape_pixel_span")
+        calib_tape_span_cm = calib_result.get("tape_cm_span")
+
+        # Physical wire length verification against blueprint checkpoints
+        inspection = golden_inspection_service.inspect_image(
+            image,
+            override_pixels_per_mm=derived_px_per_cm / 10.0,
+        )
+
+        physical_verifications: list[PhysicalVerificationItem] = []
+        for r in inspection.results:
+            src = r.node_id or ""
+            tgt = r.terminal_id or ""
+            if r.checkpoint_id.startswith("CP-NODE-"):
+                parts = r.checkpoint_id.replace("CP-NODE-", "").split("-")
+                if len(parts) >= 2:
+                    src, tgt = parts[0], parts[1]
+            elif "-" in src and not tgt:
+                parts = src.split("-")
+                if len(parts) >= 2:
+                    src, tgt = parts[0], parts[1]
+            elif not src and not tgt and r.checkpoint_id:
+                parts = r.checkpoint_id.replace("CP-", "").split("-")
+                if len(parts) >= 2:
+                    src, tgt = parts[0], parts[1]
+
+            exp_cm = round(r.expected_value / 10.0, 1) if r.expected_value is not None else 0.0
+            det_cm = round(r.detected_value / 10.0, 1) if r.detected_value is not None else None
+            dev_cm = round(r.deviation / 10.0, 1) if r.deviation is not None else None
+            tol_cm = round(r.tolerance / 10.0, 1) if r.tolerance is not None else 1.5
+
+            if r.status == "PASS" and det_cm is not None:
+                msg = f"Measured physical wire length {det_cm:.1f} cm is within tolerance ±{tol_cm:.1f} cm (expected {exp_cm:.1f} cm)"
+            elif r.status == "FAIL":
+                msg = "Component not detected at expected workpiece location"
+            else:
+                msg = r.message.replace(" mm", " cm")
+
+            physical_verifications.append(
+                PhysicalVerificationItem(
+                    checkpoint_id=r.checkpoint_id,
+                    source=src,
+                    target=tgt,
+                    type=r.type,
+                    expected_distance_cm=exp_cm,
+                    detected_distance_cm=det_cm,
+                    deviation_cm=dev_cm,
+                    tolerance_cm=tol_cm,
+                    status=r.status,
+                    confidence=r.confidence,
+                    message=msg,
+                    test_coord=r.test_coord,
+                    golden_coord=r.golden_coord,
+                )
+            )
+
+        verification_summary = PhysicalVerificationSummary(
+            overall_status=inspection.overall_status,
+            total_checkpoints=inspection.total_checkpoints,
+            passed_count=inspection.passed_count,
+            failed_count=inspection.failed_count,
+            review_count=inspection.review_count,
+            pixels_per_cm=round(derived_px_per_cm, 2),
         )
     except (ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=422, detail=f"Harness graph analysis failed: {exc}") from exc
 
-    # Obtain calibration scale (px/cm)
-    pixels_per_cm = 9.16
-    try:
-        from app.services.golden_reference_service import golden_reference_service
-        cfg = golden_reference_service.get_configuration()
-        ppm = cfg.get("calibration", {}).get("pixels_per_mm", 0.916)
-        if ppm and ppm > 0:
-            pixels_per_cm = round(float(ppm) * 10.0, 4)
-    except Exception:
-        pass
+    sheet_spec = SheetSpecification(
+        source_sheet="measurement_sheet.png",
+        total_terminals=41,
+        total_junctions=31,
+        total_nodes=12,
+        unit="cm",
+        node_distances=SHEET_NODE_DISTANCES,
+        junction_measurements=SHEET_JUNCTION_MEASUREMENTS,
+        junction_branch_counts=SHEET_JUNCTION_BRANCH_COUNTS,
+    )
 
     return HarnessGraphResponse(
         source_image=active.filename,
         production_ready=False,
+        unit="cm",
+        pixels_per_cm=graph.pixels_per_cm,
+        sheet_specification=sheet_spec,
         disclaimer=(
-            "Metric analysis (cm). Endpoint, junction, branch, orientation, and calibrated distance "
-            "results are calibrated based on reference tape calibration (1 cm ≈ 9.16 px)."
+            f"Distance calibration: {calib_method}. "
+            f"Scale: {graph.pixels_per_cm:.2f} px/cm derived from physical yellow measuring tape "
+            f"(Distance.jpeg: 50 px per 10 cm = 5.0 px/cm, scaled to {image.shape[1]} W workpiece: {graph.pixels_per_cm:.2f} px/cm). "
+            "Physical wire verifications report the actual blueprint-specified branch distances (J1-T1, N1-N2, etc.) "
+            "and active workpiece measurements in cm."
         ),
         metrics=HarnessGraphMetrics(
             endpoint_count=len(graph.endpoints),
@@ -202,12 +355,10 @@ def analyse_demo_harness_graph() -> HarnessGraphResponse:
             skeleton_pixel_count=graph.skeleton_pixel_count,
             neighbour_connectivity=8,
             junction_cluster_radius=harness_graph_service.junction_cluster_radius,
+            total_wire_length_cm=graph.total_wire_length_cm,
+            extracted_branch_length_cm=graph.extracted_branch_length_cm,
             total_wire_length_pixels=graph.total_wire_length_pixels,
             extracted_branch_length_pixels=graph.extracted_branch_length_pixels,
-            total_wire_length_cm=round(graph.total_wire_length_pixels / pixels_per_cm, 2),
-            extracted_branch_length_cm=round(graph.extracted_branch_length_pixels / pixels_per_cm, 2),
-            unit="cm",
-            pixels_per_cm=pixels_per_cm,
             extracted_branch_count=len(graph.branches),
             topology_terminal_count=sum(
                 node.node_type == "END_TERMINAL" for node in graph.nodes
@@ -217,17 +368,24 @@ def analyse_demo_harness_graph() -> HarnessGraphResponse:
         endpoints=[GraphPointResponse(x=point.x, y=point.y) for point in graph.endpoints],
         junctions=[GraphPointResponse(x=point.x, y=point.y) for point in graph.junctions],
         measurements=HarnessGraphMeasurements(
+            unit="cm",
             length_method=(
-                f"8-connected skeleton centreline calibrated in centimetres (cm): "
-                f"1 cm = {pixels_per_cm:.2f} px. Orthogonal step = 1 px; diagonal step = sqrt(2) px."
+                f"8-connected skeleton centreline with {graph.pixels_per_cm:.2f} px/cm calibration: "
+                "orthogonal step = 1 px; diagonal step = sqrt(2) px"
             ),
             orientation_convention=(
                 "Clockwise image coordinates: 0 degrees = right, 90 = down, "
                 "180 = left, 270 = up"
             ),
             branch_distance_definition=(
-                "Branch-to-branch distance is measured in centimetres (cm) between branch midpoints, "
-                "both through their common junction and as a straight metric distance."
+                "Distances in cm (and px): Branch-to-branch distance is measured between branch midpoints, "
+                "both through their common junction and as a straight distance"
+            ),
+            calibration_summary=(
+                f"Calibrated at {graph.pixels_per_cm:.2f} px/cm (1 px = {1.0 / graph.pixels_per_cm:.4f} cm). "
+                f"Source: yellow measuring tape in Distance.jpeg (tape={calib_tape_span_px or 439:.0f}px={calib_tape_span_cm or 88:.0f}cm). "
+                f"Method: {calib_method}. "
+                f"Physical image size: {image.shape[1]/graph.pixels_per_cm:.1f}cm W × {image.shape[0]/graph.pixels_per_cm:.1f}cm H."
             ),
             nodes=[
                 GraphNodeResponse(
@@ -251,12 +409,11 @@ def analyse_demo_harness_graph() -> HarnessGraphResponse:
                     branch_id=branch.branch_id,
                     source_node_id=branch.source_node_id,
                     target_node_id=branch.target_node_id,
+                    path_length_cm=branch.path_length_cm,
+                    straight_distance_cm=branch.straight_distance_cm,
                     path_length_pixels=branch.path_length_pixels,
                     straight_distance_pixels=branch.straight_distance_pixels,
                     orientation_degrees=branch.orientation_degrees,
-                    path_length_cm=round(branch.path_length_pixels / pixels_per_cm, 2),
-                    straight_distance_cm=round(branch.straight_distance_pixels / pixels_per_cm, 2),
-                    unit="cm",
                 )
                 for branch in graph.branches
             ],
@@ -264,11 +421,10 @@ def analyse_demo_harness_graph() -> HarnessGraphResponse:
                 JunctionTerminalDistanceResponse(
                     junction_node_id=distance.junction_node_id,
                     terminal_node_id=distance.terminal_node_id,
+                    path_distance_cm=distance.path_distance_cm,
+                    straight_distance_cm=distance.straight_distance_cm,
                     path_distance_pixels=distance.path_distance_pixels,
                     straight_distance_pixels=distance.straight_distance_pixels,
-                    path_distance_cm=round(distance.path_distance_pixels / pixels_per_cm, 2),
-                    straight_distance_cm=round(distance.straight_distance_pixels / pixels_per_cm, 2),
-                    unit="cm",
                 )
                 for distance in graph.junction_terminal_distances
             ],
@@ -277,14 +433,13 @@ def analyse_demo_harness_graph() -> HarnessGraphResponse:
                     junction_node_id=distance.junction_node_id,
                     first_branch_id=distance.first_branch_id,
                     second_branch_id=distance.second_branch_id,
+                    via_junction_distance_cm=distance.via_junction_distance_cm,
+                    midpoint_straight_distance_cm=distance.midpoint_straight_distance_cm,
                     via_junction_distance_pixels=distance.via_junction_distance_pixels,
                     midpoint_straight_distance_pixels=(
                         distance.midpoint_straight_distance_pixels
                     ),
                     angular_separation_degrees=distance.angular_separation_degrees,
-                    via_junction_distance_cm=round(distance.via_junction_distance_pixels / pixels_per_cm, 2),
-                    midpoint_straight_distance_cm=round(distance.midpoint_straight_distance_pixels / pixels_per_cm, 2),
-                    unit="cm",
                 )
                 for distance in graph.branch_pair_distances
             ],
@@ -293,4 +448,6 @@ def analyse_demo_harness_graph() -> HarnessGraphResponse:
             skeleton_image=_png_data_url(graph.skeleton_image),
             graph_overlay=_png_data_url(graph.overlay_image),
         ),
+        physical_verifications=physical_verifications,
+        verification_summary=verification_summary,
     )

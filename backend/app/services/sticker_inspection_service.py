@@ -9,8 +9,16 @@ from pathlib import Path
 import cv2
 import numpy as np
 from numpy.typing import NDArray
-import zxingcpp
-from rapidocr_onnxruntime import RapidOCR
+
+try:
+    import zxingcpp
+except ImportError:
+    zxingcpp = None
+
+try:
+    from rapidocr_onnxruntime import RapidOCR
+except ImportError:
+    RapidOCR = None
 
 from app.core.settings import get_settings
 
@@ -45,7 +53,7 @@ class StickerInspectionService:
     """Detects wire harness specification stickers, decodes barcodes, and performs OCR extraction."""
 
     def __init__(self) -> None:
-        self._ocr = RapidOCR()
+        self._ocr = RapidOCR() if RapidOCR is not None else None
         self._reference_crop_path = get_settings().project_root / "data" / "reference_sticker.png"
         self._reference_portrait_path = get_settings().project_root / "data" / "reference_sticker_portrait.png"
         self._reference_closeup_path = get_settings().project_root / "data" / "reference_sticker_closeup.jpg"
@@ -149,7 +157,9 @@ class StickerInspectionService:
         )
         # Convert back to BGR for RapidOCR
         big_bgr = cv2.cvtColor(big, cv2.COLOR_GRAY2BGR)
-        results, _ = self._ocr(big_bgr)
+        results = None
+        if self._ocr is not None:
+            results, _ = self._ocr(big_bgr)
         return [t[1] for t in results] if results else []
 
     def inspect(self, image: ImageArray) -> StickerInspectionOutcome:
@@ -159,11 +169,13 @@ class StickerInspectionService:
         height, width = image.shape[:2]
 
         # 1. Direct barcode scan with zxing-cpp
-        barcodes = zxingcpp.read_barcodes(image)
+        barcodes = zxingcpp.read_barcodes(image) if zxingcpp is not None else []
         barcode_val = barcodes[0].text if barcodes else None
 
         # 2. Direct OCR pass on full image
-        ocr_results, _ = self._ocr(image)
+        ocr_results = None
+        if self._ocr is not None:
+            ocr_results, _ = self._ocr(image)
         all_texts: list[str] = [t[1] for t in ocr_results] if ocr_results else []
 
         # 3. Check for keywords

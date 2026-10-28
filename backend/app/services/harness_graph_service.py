@@ -41,6 +41,8 @@ class GraphBranch:
     path_length_pixels: float
     straight_distance_pixels: float
     orientation_degrees: float
+    path_length_cm: float = 0.0
+    straight_distance_cm: float = 0.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,6 +51,8 @@ class JunctionTerminalDistance:
     terminal_node_id: str
     path_distance_pixels: float
     straight_distance_pixels: float
+    path_distance_cm: float = 0.0
+    straight_distance_cm: float = 0.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,6 +63,8 @@ class BranchPairDistance:
     via_junction_distance_pixels: float
     midpoint_straight_distance_pixels: float
     angular_separation_degrees: float
+    via_junction_distance_cm: float = 0.0
+    midpoint_straight_distance_cm: float = 0.0
 
 
 @dataclass(frozen=True, slots=True)
@@ -76,6 +82,9 @@ class HarnessGraphResult:
     branches: list[GraphBranch]
     junction_terminal_distances: list[JunctionTerminalDistance]
     branch_pair_distances: list[BranchPairDistance]
+    total_wire_length_cm: float = 0.0
+    extracted_branch_length_cm: float = 0.0
+    pixels_per_cm: float = 6.70
 
 
 class HarnessGraphService:
@@ -96,11 +105,23 @@ class HarnessGraphService:
         binary_mask: ImageArray,
         *,
         base_image: ImageArray | None = None,
+        pixels_per_cm: float | None = None,
     ) -> HarnessGraphResult:
         if binary_mask.ndim != 2:
             raise ValueError("Expected a single-channel binary mask")
         if binary_mask.size == 0:
             raise ValueError("Binary mask is empty")
+
+        if pixels_per_cm is None or pixels_per_cm <= 0:
+            try:
+                from app.services.calibration_service import pixels_per_cm_for_width
+                w = int(binary_mask.shape[1])
+                pixels_per_cm = pixels_per_cm_for_width(w)
+            except Exception:
+                # Ultimate fallback: proportional to calibration reference
+                # Calibration: 459px wide image → 47.70 px/cm
+                w = int(binary_mask.shape[1])
+                pixels_per_cm = round(47.70 * (w / 459), 4)
 
         skeleton_bool = skeletonize(binary_mask > 0)
         skeleton = skeleton_bool.astype(np.uint8)
@@ -125,6 +146,7 @@ class HarnessGraphService:
             endpoint_mask,
             junctions,
             junction_regions,
+            pixels_per_cm=pixels_per_cm,
         )
         nodes, branches, terminal_distances, branch_pair_distances, unresolved = topology
 
@@ -134,6 +156,8 @@ class HarnessGraphService:
             nodes=nodes,
             base_image=base_image,
         )
+        total_wire_px = self._skeleton_length(skeleton_bool)
+        extracted_branch_px = sum(branch.path_length_pixels for branch in branches)
         return HarnessGraphResult(
             skeleton_image=skeleton_image,
             overlay_image=overlay_image,
@@ -141,13 +165,16 @@ class HarnessGraphService:
             junctions=junctions,
             candidate_junction_pixel_count=int(np.count_nonzero(junction_candidate_mask)),
             skeleton_pixel_count=int(np.count_nonzero(skeleton_bool)),
-            total_wire_length_pixels=self._skeleton_length(skeleton_bool),
-            extracted_branch_length_pixels=sum(branch.path_length_pixels for branch in branches),
+            total_wire_length_pixels=total_wire_px,
+            extracted_branch_length_pixels=extracted_branch_px,
             unresolved_segment_count=unresolved,
             nodes=nodes,
             branches=branches,
             junction_terminal_distances=terminal_distances,
             branch_pair_distances=branch_pair_distances,
+            total_wire_length_cm=round(total_wire_px / pixels_per_cm, 2),
+            extracted_branch_length_cm=round(extracted_branch_px / pixels_per_cm, 2),
+            pixels_per_cm=round(pixels_per_cm, 4),
         )
 
     @staticmethod
@@ -190,6 +217,7 @@ class HarnessGraphService:
         endpoint_mask: NDArray[np.bool_],
         junctions: list[GraphPoint],
         junction_regions: list[NDArray[np.bool_]],
+        pixels_per_cm: float = 6.70,
     ) -> tuple[
         list[GraphNode],
         list[GraphBranch],
@@ -242,13 +270,16 @@ class HarnessGraphService:
                 + self._nearest_distance(source_point, component_x, component_y)
                 + self._nearest_distance(target_point, component_x, component_y)
             )
+            straight_dist = self._point_distance(source_point, target_point)
             branches.append(GraphBranch(
                 branch_id=f"B{len(branches) + 1:03d}",
                 source_node_id=node_ids[source_index],
                 target_node_id=node_ids[target_index],
                 path_length_pixels=path_length,
-                straight_distance_pixels=self._point_distance(source_point, target_point),
+                straight_distance_pixels=straight_dist,
                 orientation_degrees=self._orientation(source_point, target_point),
+                path_length_cm=round(path_length / pixels_per_cm, 2),
+                straight_distance_cm=round(straight_dist / pixels_per_cm, 2),
             ))
 
         incident: dict[str, list[GraphBranch]] = {node_id: [] for node_id in node_ids}
@@ -278,8 +309,8 @@ class HarnessGraphService:
         return (
             nodes,
             branches,
-            self._nearest_terminal_distances(nodes, branches),
-            self._branch_pair_distances(nodes, incident, point_by_id),
+            self._nearest_terminal_distances(nodes, branches, pixels_per_cm=pixels_per_cm),
+            self._branch_pair_distances(nodes, incident, point_by_id, pixels_per_cm=pixels_per_cm),
             unresolved_segment_count,
         )
 
@@ -304,6 +335,7 @@ class HarnessGraphService:
         self,
         nodes: list[GraphNode],
         branches: list[GraphBranch],
+        pixels_per_cm: float = 6.70,
     ) -> list[JunctionTerminalDistance]:
         node_by_id = {node.node_id: node for node in nodes}
         terminal_ids = {node.node_id for node in nodes if node.node_type == "END_TERMINAL"}
@@ -318,13 +350,16 @@ class HarnessGraphService:
             if nearest is None:
                 continue
             terminal_id, path_distance = nearest
+            straight_dist = self._point_distance(
+                junction.point, node_by_id[terminal_id].point
+            )
             results.append(JunctionTerminalDistance(
                 junction_node_id=junction.node_id,
                 terminal_node_id=terminal_id,
                 path_distance_pixels=path_distance,
-                straight_distance_pixels=self._point_distance(
-                    junction.point, node_by_id[terminal_id].point
-                ),
+                straight_distance_pixels=straight_dist,
+                path_distance_cm=round(path_distance / pixels_per_cm, 2),
+                straight_distance_cm=round(straight_dist / pixels_per_cm, 2),
             ))
         return results
 
@@ -354,6 +389,7 @@ class HarnessGraphService:
         nodes: list[GraphNode],
         incident: dict[str, list[GraphBranch]],
         point_by_id: dict[str, GraphPoint],
+        pixels_per_cm: float = 6.70,
     ) -> list[BranchPairDistance]:
         results: list[BranchPairDistance] = []
         for junction in (node for node in nodes if node.node_type == "JUNCTION"):
@@ -373,13 +409,17 @@ class HarnessGraphService:
                     first_angle = self._orientation(junction.point, point_by_id[first_other])
                     second_angle = self._orientation(junction.point, point_by_id[second_other])
                     angle_delta = abs(first_angle - second_angle)
+                    via_px = (first.path_length_pixels + second.path_length_pixels) / 2.0
+                    straight_px = self._point_distance(first_midpoint, second_midpoint)
                     results.append(BranchPairDistance(
                         junction_node_id=junction.node_id,
                         first_branch_id=first.branch_id,
                         second_branch_id=second.branch_id,
-                        via_junction_distance_pixels=(first.path_length_pixels + second.path_length_pixels) / 2.0,
-                        midpoint_straight_distance_pixels=self._point_distance(first_midpoint, second_midpoint),
+                        via_junction_distance_pixels=via_px,
+                        midpoint_straight_distance_pixels=straight_px,
                         angular_separation_degrees=min(angle_delta, 360.0 - angle_delta),
+                        via_junction_distance_cm=round(via_px / pixels_per_cm, 2),
+                        midpoint_straight_distance_cm=round(straight_px / pixels_per_cm, 2),
                     ))
         return results
 
