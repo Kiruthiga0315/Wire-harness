@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import cv2
+import numpy as np
 from fastapi import APIRouter, File, HTTPException, Response, UploadFile
 from fastapi.responses import FileResponse
 
@@ -40,6 +42,81 @@ async def upload_active_image(file: UploadFile = File(...)) -> dict[str, object]
         "size": len(record.data),
         "source": record.source,
     }
+
+
+def detect_table_box(bgr_image: np.ndarray) -> tuple[int, int, int, int] | None:
+    height, width = bgr_image.shape[:2]
+    if width <= 1000:
+        return None
+    grayscale = cv2.cvtColor(bgr_image, cv2.COLOR_BGR2GRAY)
+    blurred = cv2.GaussianBlur(grayscale, (5, 5), 0)
+    _, bright = cv2.threshold(blurred, 205, 255, cv2.THRESH_BINARY)
+    kernel_table = cv2.getStructuringElement(cv2.MORPH_RECT, (35, 35))
+    table_closed = cv2.morphologyEx(bright, cv2.MORPH_CLOSE, kernel_table)
+    cnts, _ = cv2.findContours(table_closed, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    max_area = 0.0
+    table_box = None
+    for c in cnts:
+        area = float(cv2.contourArea(c))
+        if area > (height * width * 0.05):
+            bx, by, bw, bh = cv2.boundingRect(c)
+            if area > max_area:
+                max_area = area
+                table_box = (bx, by, bw, bh)
+    if table_box is not None:
+        tx, ty, tw, th = table_box
+        pad_x, pad_y = int(tw * 0.02), int(th * 0.02)
+        tx1 = max(0, tx + pad_x)
+        ty1 = max(0, ty + pad_y)
+        tx2 = min(width, tx + tw - pad_x)
+        ty2 = min(height, ty + th - pad_y)
+        return (tx1, ty1, tx2 - tx1, ty2 - ty1)
+    return None
+
+
+@router.get(
+    "/active/cropped",
+    summary="Retrieve the cropped table view of the current active inspection image",
+)
+def get_active_image_cropped() -> Response:
+    try:
+        record = active_image_service.get_active_image()
+    except Exception as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    table_box = detect_table_box(record.bgr_image)
+    if table_box is None:
+        return Response(
+            content=record.data,
+            media_type=record.content_type,
+            headers={
+                "Cache-Control": "no-store",
+                "Access-Control-Allow-Origin": "*",
+                "X-Is-Cropped": "false",
+            },
+        )
+
+    tx, ty, tw, th = table_box
+    cropped_bgr = record.bgr_image[ty:ty + th, tx:tx + tw]
+    success, encoded = cv2.imencode(".jpg", cropped_bgr, [int(cv2.IMWRITE_JPEG_QUALITY), 92])
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to encode cropped table image")
+
+    return Response(
+        content=encoded.tobytes(),
+        media_type="image/jpeg",
+        headers={
+            "Cache-Control": "no-store",
+            "Access-Control-Allow-Origin": "*",
+            "X-Is-Cropped": "true",
+            "X-Crop-X": str(tx),
+            "X-Crop-Y": str(ty),
+            "X-Crop-Width": str(tw),
+            "X-Crop-Height": str(th),
+            "X-Original-Width": str(record.width),
+            "X-Original-Height": str(record.height),
+        },
+    )
 
 
 @router.get(

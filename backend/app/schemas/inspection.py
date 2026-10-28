@@ -42,3 +42,7 @@ class MockInspectionResponse(BaseModel):
     cycle_time_seconds: float
     timestamp: datetime
     results: list[MockCheckpointResult]
+    cropped_image_url: str | None = None
+    crop_width: int | None = None
+    crop_height: int | None = None
+    is_cropped: bool = False

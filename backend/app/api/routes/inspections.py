@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.models import Checkpoint, ProductModel
 from app.schemas.inspection import MockInspectionRequest, MockInspectionResponse
+from app.services.active_image_service import active_image_service
 from app.services.mock_inspection_service import MockInspectionService
 
 router = APIRouter(prefix="/inspections", tags=["Inspections"])
@@ -45,10 +46,24 @@ async def process_demo_inspection(
 
     logger.info("Mock inspection started | model=%s", payload.model_id)
     await asyncio.sleep(DEMO_PROCESSING_SECONDS)
+    try:
+        active_rec = active_image_service.get_active_image()
+        img_width = active_rec.width
+        img_height = active_rec.height
+        from app.api.routes.images import detect_table_box
+        table_box = detect_table_box(active_rec.bgr_image)
+    except Exception:
+        img_width = None
+        img_height = None
+        table_box = None
+
     response = mock_inspection_service.evaluate(
         model,
         checkpoints,
         cycle_time_seconds=DEMO_PROCESSING_SECONDS,
+        image_width=img_width,
+        image_height=img_height,
+        table_crop=table_box,
     )
     logger.info(
         "Mock inspection completed | model=%s | result=%s | pass=%s | ng=%s",

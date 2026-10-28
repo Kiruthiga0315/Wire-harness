@@ -6,7 +6,7 @@ import { HarnessBoard } from '../components/HarnessBoard'
 import { PageHeader } from '../components/PageHeader'
 import { StatusPill } from '../components/StatusPill'
 import { useInspection } from '../context/InspectionContext'
-import { loadDemoImage, runMockInspection } from '../services/api'
+import { API_BASE_URL, loadDemoImage, runMockInspection } from '../services/api'
 import type { InspectionState, MockCheckpointResult } from '../types/inspection'
 
 const MAX_UPLOAD_BYTES = 15 * 1024 * 1024
@@ -33,6 +33,7 @@ export function LiveInspectionPage() {
     setImage,
     setImageBlob,
     syncingActiveImage,
+    activeVersion,
     imageLoading,
     setImageLoading,
     inspectionState,
@@ -114,6 +115,13 @@ export function LiveInspectionPage() {
   const overallLabel = processing ? 'PROCESSING' : inspection?.state ?? (image ? 'IMAGE READY' : 'READY')
   const overallClass = inspection?.state === 'NG' ? 'overall-result--ng' : inspection?.state === 'PASS' ? 'overall-result--pass' : processing ? 'overall-result--processing' : 'overall-result--ready'
 
+  const isCroppedView = Boolean(inspection?.is_cropped && inspection.cropped_image_url)
+  const displayImageUrl = isCroppedView
+    ? `${API_BASE_URL}${inspection!.cropped_image_url}?v=${activeVersion}`
+    : image?.url ?? null
+  const displayWidth = isCroppedView ? (inspection?.crop_width ?? image?.width ?? null) : image?.width ?? null
+  const displayHeight = isCroppedView ? (inspection?.crop_height ?? image?.height ?? null) : image?.height ?? null
+
   return (
     <>
       <PageHeader
@@ -135,23 +143,27 @@ export function LiveInspectionPage() {
           <div className="panel-header"><div><p className="eyebrow">CAMERA 1 — TOP VIEW</p><h2>Inspection image</h2></div><StatusPill tone={stateTone(inspectionState)}>{inspection ? `${inspection.state} RESULT` : image ? 'IMAGE READY' : 'AWAITING IMAGE'}</StatusPill></div>
           {error && <div className="image-error" role="alert">{error}</div>}
           <HarnessBoard
-            imageUrl={image?.url ?? null}
+            imageUrl={displayImageUrl}
             imageAlt={image ? `Wire harness test image: ${image.name}` : 'No wire harness image loaded'}
-            width={image?.width ?? null}
-            height={image?.height ?? null}
+            width={displayWidth}
+            height={displayHeight}
             loading={imageLoading}
             processing={processing}
             results={inspection?.results ?? []}
             selectedCheckpointId={selectedResult?.checkpoint_id ?? null}
             onSelectResult={setSelectedResult}
-            onLoad={(width, height) => setImage((current) => current ? { ...current, width, height } : null)}
+            onLoad={(width, height) => {
+              if (!isCroppedView) {
+                setImage((current) => current ? { ...current, width, height } : null)
+              }
+            }}
             onError={handleImageError}
           />
           {image && (
             <div className="image-metadata" aria-label="Loaded image information">
               <div><span>Source</span><strong>{image.source === 'demo' ? 'DEMO IMAGE' : 'LOCAL UPLOAD'}</strong></div>
-              <div><span>File</span><strong title={image.name}>{image.name}</strong></div>
-              <div><span>Resolution</span><strong>{image.width && image.height ? `${image.width} × ${image.height} px` : 'DECODING…'}</strong></div>
+              <div><span>File</span><strong title={image.name}>{image.name}{isCroppedView ? ' (Table Crop)' : ''}</strong></div>
+              <div><span>Resolution</span><strong>{displayWidth && displayHeight ? `${displayWidth} × ${displayHeight} px ${isCroppedView ? '(CROP)' : ''}` : 'DECODING…'}</strong></div>
               <div><span>File size</span><strong>{formatFileSize(image.size)}</strong></div>
               <div><span>Processing</span><strong className={inspection ? (inspection.state === 'NG' ? 'metadata-ng' : 'metadata-ready') : 'metadata-ready'}>{processing ? 'IN PROGRESS' : inspection ? 'COMPLETE' : 'READY'}</strong></div>
             </div>

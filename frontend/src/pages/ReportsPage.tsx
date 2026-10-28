@@ -12,7 +12,7 @@ const px = (value: number) => `${value.toFixed(1)} px`
 const degrees = (value: number) => `${value.toFixed(1)}°`
 
 export function ReportsPage() {
-  const { image, activeVersion } = useInspection()
+  const { image } = useInspection()
   const [report, setReport] = useState<InspectionReportResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [exporting, setExporting] = useState(false)
@@ -29,7 +29,7 @@ export function ReportsPage() {
       if (reportError instanceof DOMException && reportError.name === 'AbortError') return
       setError(reportError instanceof Error ? reportError.message : 'Report generation failed.')
     } finally {
-      setLoading(false)
+      if (!signal?.aborted) setLoading(false)
     }
   }, [])
 
@@ -37,7 +37,7 @@ export function ReportsPage() {
     const controller = new AbortController()
     void loadReport(controller.signal)
     return () => controller.abort()
-  }, [loadReport, image?.name, image?.url, activeVersion])
+  }, [loadReport, image?.name, image?.url])
 
   const filteredCheckpoints = useMemo(() => {
     if (!report) return []

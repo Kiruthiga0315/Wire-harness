@@ -172,7 +172,7 @@ def analyse_demo_harness_graph() -> HarnessGraphResponse:
         segmentation = segmentation_service.segment(image)
         graph = harness_graph_service.analyse(
             segmentation.binary_mask,
-            base_image=image,
+            base_image=segmentation.cropped_base_image if segmentation.cropped_base_image is not None else image,
         )
     except (ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=422, detail=f"Harness graph analysis failed: {exc}") from exc

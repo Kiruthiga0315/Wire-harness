@@ -72,6 +72,10 @@ logs/*
 *.log
 
 # Database files
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
 data/*.db
 data/*.sqlite
 data/*.sqlite3

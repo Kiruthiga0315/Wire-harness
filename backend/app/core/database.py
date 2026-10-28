@@ -81,18 +81,18 @@ def seed_demo_data(session: Session) -> None:
         demo_model.active = True
 
     checkpoint_specs = [
-        ("CP-001", "Upper End Terminal Presence", "Terminal", "Presence", "Present", None, 108, 42, 80, 70),
-        ("CP-002", "Upper Connector Presence", "Connector", "Presence", "Present", None, 149, 139, 100, 100),
-        ("CP-003", "Main Junction Position", "Junction", "Position", "X 457 / Y 267", 20.0, 457, 267, 130, 120),
-        ("CP-004", "Branch Connector Orientation", "Orientation", "Orientation", "90 degrees", 5.0, 357, 349, 100, 100),
-        ("CP-005", "Right Connector Presence", "Connector", "Presence", "Present", None, 524, 392, 90, 80),
-        ("CP-006", "Upper Clip Presence", "Clip", "Presence", "Present", None, 334, 482, 90, 80),
-        ("CP-007", "Main Sleeve Presence", "Sleeve", "Presence", "Present", None, 466, 690, 120, 150),
-        ("CP-008", "Tape T1 Colour", "Tape", "Colour", "Blue", None, 365, 440, 100, 100),
-        ("CP-009", "Lower Connector Presence", "Connector", "Presence", "Present", None, 120, 966, 100, 110),
-        ("CP-010", "Overall Harness Routing", "Routing", "Routing", "Within reference route", 25.0, 356, 1115, 260, 180),
-        ("CP-011", "Branch B2 Length", "Dimension", "Length", "750 mm", 10.0, 393, 1331, 220, 180),
-        ("CP-012", "Lower End Terminal Presence", "Terminal", "Presence", "Present", None, 126, 1452, 90, 100),
+        ("CP-001", "Upper End Terminal Presence", "Terminal", "Presence", "Present", None, 1130, 410, 140, 120),
+        ("CP-002", "Upper Connector Presence", "Connector", "Presence", "Present", None, 1260, 410, 150, 140),
+        ("CP-003", "Main Junction Position", "Junction", "Position", "X 1430 / Y 620", 20.0, 1430, 620, 180, 160),
+        ("CP-004", "Branch Connector Orientation", "Orientation", "Orientation", "90 degrees", 5.0, 1535, 545, 140, 140),
+        ("CP-005", "Right Connector Presence", "Connector", "Presence", "Present", None, 1635, 555, 150, 140),
+        ("CP-006", "Upper Clip Presence", "Clip", "Presence", "Present", None, 1360, 780, 130, 120),
+        ("CP-007", "Main Sleeve Presence", "Sleeve", "Presence", "Present", None, 1460, 950, 160, 220),
+        ("CP-008", "Tape T1 Colour", "Tape", "Colour", "Blue", None, 1480, 800, 130, 130),
+        ("CP-009", "Lower Connector Presence", "Connector", "Presence", "Present", None, 1670, 1180, 150, 150),
+        ("CP-010", "Overall Harness Routing", "Routing", "Routing", "Within reference route", 25.0, 1420, 1300, 240, 200),
+        ("CP-011", "Branch B2 Length", "Dimension", "Length", "750 mm", 10.0, 1330, 1600, 260, 220),
+        ("CP-012", "Lower End Terminal Presence", "Terminal", "Presence", "Present", None, 1650, 1860, 160, 140),
     ]
 
     existing_checkpoints = {

@@ -35,4 +35,8 @@ export interface MockInspectionResponse {
   cycle_time_seconds: number
   timestamp: string
   results: MockCheckpointResult[]
+  cropped_image_url?: string | null
+  crop_width?: number | null
+  crop_height?: number | null
+  is_cropped?: boolean
 }
