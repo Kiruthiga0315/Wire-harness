@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.models import Checkpoint
+from app.schemas.checkpoint import CheckpointRead
 from app.schemas.color_inspection import (
     ColorInspectionRequest,
     ColorInspectionResponse,
@@ -93,6 +94,28 @@ def segment_demo_image() -> SegmentationResponse:
             skeleton_image=_png_data_url(result.skeleton_image),
         ),
     )
+
+
+@router.post(
+    "/checkpoints/sync-golden",
+    response_model=list[CheckpointRead],
+    summary="Sync engineering checkpoints from Golden Reference & Checkpoints",
+)
+def sync_engineering_checkpoints_from_golden(
+    model_id: str = "DEMO-HARNESS-001",
+    replace: bool = True,
+    scale_to_active_image: bool = True,
+    db: Session = Depends(get_db),
+) -> list[CheckpointRead]:
+    from app.services.checkpoint_service import CheckpointService, ModelNotFoundError
+    try:
+        return CheckpointService(db).sync_from_golden_reference(
+            model_id=model_id,
+            replace=replace,
+            scale_to_active_image=scale_to_active_image,
+        )  # type: ignore[return-value]
+    except ModelNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Product model not found") from exc
 
 
 @router.post(

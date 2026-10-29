@@ -207,6 +207,19 @@ export function deleteCheckpoint(modelId: string, checkpointId: string): Promise
   })
 }
 
+export function syncCheckpointsFromGolden(
+  modelId: string = 'DEMO-HARNESS-001',
+  replace: boolean = true,
+  scaleToActiveImage: boolean = true,
+): Promise<EngineeringCheckpoint[]> {
+  return checkpointRequest<EngineeringCheckpoint[]>(
+    `${checkpointPath(modelId)}/sync-from-golden?replace=${replace}&scale_to_active_image=${scaleToActiveImage}`,
+    {
+      method: 'POST',
+    },
+  )
+}
+
 export async function runMockInspection(modelId: string): Promise<MockInspectionResponse> {
   try {
     const response = await fetch(`${API_BASE_URL}/api/inspections/demo/process`, {

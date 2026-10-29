@@ -1,4 +1,14 @@
-import { Beaker, Binary, Boxes, FileImage, ImagePlus, Network, RefreshCw, TriangleAlert } from 'lucide-react'
+import {
+  Beaker,
+  Binary,
+  Boxes,
+  CheckCircle2,
+  FileImage,
+  ImagePlus,
+  Network,
+  RefreshCw,
+  TriangleAlert,
+} from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ChangeEvent } from 'react'
 import { EngineeringCheckpointEditor } from '../components/EngineeringCheckpointEditor'
@@ -7,7 +17,7 @@ import { HarnessGraphPanel } from '../components/HarnessGraphPanel'
 import { PageHeader } from '../components/PageHeader'
 import { StatusPill } from '../components/StatusPill'
 import { useInspection } from '../context/InspectionContext'
-import { ACTIVE_IMAGE_URL, loadDemoImage, runDemoSegmentation } from '../services/api'
+import { ACTIVE_IMAGE_URL, loadDemoImage, runDemoSegmentation, syncCheckpointsFromGolden } from '../services/api'
 import type { SegmentationResponse } from '../types/engineering'
 
 const MAX_UPLOAD_BYTES = 15 * 1024 * 1024
@@ -23,6 +33,10 @@ export function EngineeringViewPage() {
   const [result, setResult] = useState<SegmentationResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [syncingCheckpoints, setSyncingCheckpoints] = useState(false)
+  const [syncSuccessMessage, setSyncSuccessMessage] = useState<string | null>(null)
+  const [editorRefreshTrigger, setEditorRefreshTrigger] = useState(0)
+  const [colorRefreshTrigger, setColorRefreshTrigger] = useState(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const processImage = useCallback(async (signal?: AbortSignal) => {
@@ -73,6 +87,29 @@ export function EngineeringViewPage() {
     }
   }
 
+  const handleSyncGoldenCheckpoints = async () => {
+    setSyncingCheckpoints(true)
+    setError(null)
+    setSyncSuccessMessage(null)
+    try {
+      const synced = await syncCheckpointsFromGolden('DEMO-HARNESS-001', true, true)
+      setEditorRefreshTrigger((v) => v + 1)
+      setColorRefreshTrigger((v) => v + 1)
+      setSyncSuccessMessage(
+        `Synchronized ${synced.length} checkpoints from Golden Reference & Checkpoints (Terminals, Spine Nodes, Junctions).`
+      )
+      setTimeout(() => setSyncSuccessMessage(null), 7000)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to sync checkpoints from Golden Reference.')
+    } finally {
+      setSyncingCheckpoints(false)
+    }
+  }
+
+  const handleEditorCheckpointsChanged = useCallback(() => {
+    setColorRefreshTrigger((v) => v + 1)
+  }, [])
+
   const imageWidth = image?.width ?? result?.metrics.image_width ?? 681
   const imageHeight = image?.height ?? result?.metrics.image_height ?? 1584
   const activeWorkpieceUrl = image?.url || `${ACTIVE_IMAGE_URL}?v=${activeVersion}`
@@ -94,8 +131,17 @@ export function EngineeringViewPage() {
             />
             <button
               className="button button--secondary"
+              onClick={() => void handleSyncGoldenCheckpoints()}
+              disabled={loading || syncingActiveImage || syncingCheckpoints}
+              title="Synchronize checkpoints from Golden Reference & Checkpoints"
+            >
+              <RefreshCw size={18} className={syncingCheckpoints ? 'spin' : ''} />
+              {syncingCheckpoints ? 'Syncing checkpoints…' : 'Sync from Golden Reference'}
+            </button>
+            <button
+              className="button button--secondary"
               onClick={() => fileInputRef.current?.click()}
-              disabled={loading || syncingActiveImage}
+              disabled={loading || syncingActiveImage || syncingCheckpoints}
               title="Upload any JPEG, PNG, or BMP wire harness image"
             >
               <ImagePlus size={18} />
@@ -104,7 +150,7 @@ export function EngineeringViewPage() {
             <button
               className="button button--secondary"
               onClick={() => void handleLoadDemo()}
-              disabled={loading || syncingActiveImage}
+              disabled={loading || syncingActiveImage || syncingCheckpoints}
               title="Reset workpiece to standard demo harness"
             >
               <FileImage size={18} />
@@ -113,7 +159,7 @@ export function EngineeringViewPage() {
             <button
               className="button button--primary"
               onClick={() => void processImage()}
-              disabled={loading || syncingActiveImage}
+              disabled={loading || syncingActiveImage || syncingCheckpoints}
             >
               <RefreshCw size={18} className={loading || syncingActiveImage ? 'spin' : ''} />
               {loading ? 'Processing…' : syncingActiveImage ? 'Syncing…' : 'Run segmentation'}
@@ -121,6 +167,33 @@ export function EngineeringViewPage() {
           </div>
         }
       />
+
+      {syncSuccessMessage && (
+        <div
+          className="alert-banner"
+          role="status"
+          style={{
+            background: '#ecfdf5',
+            borderColor: '#a7f3d0',
+            color: '#065f46',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            padding: '12px 18px',
+            marginBottom: '18px',
+            borderRadius: '4px',
+            border: '1px solid #a7f3d0',
+          }}
+        >
+          <CheckCircle2 size={20} style={{ color: '#059669', flexShrink: 0 }} />
+          <div>
+            <strong style={{ display: 'block', fontSize: '13px', color: '#065f46' }}>
+              Golden Reference Checkpoints Synchronized
+            </strong>
+            <span style={{ fontSize: '12px', color: '#047857' }}>{syncSuccessMessage}</span>
+          </div>
+        </div>
+      )}
 
       <div className="engineering-warning">
         <TriangleAlert size={20} />
@@ -132,9 +205,11 @@ export function EngineeringViewPage() {
         imageWidth={imageWidth}
         imageHeight={imageHeight}
         imageUrl={activeWorkpieceUrl}
+        refreshTrigger={editorRefreshTrigger}
+        onCheckpointsChanged={handleEditorCheckpointsChanged}
       />
 
-      <ColorInspectionPanel />
+      <ColorInspectionPanel refreshTrigger={colorRefreshTrigger} />
 
       <div className="engineering-section-title">
         <div>

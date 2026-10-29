@@ -9,7 +9,11 @@ import { StatusPill } from './StatusPill'
 const MODEL_ID = 'DEMO-HARNESS-001'
 const supportedColours = new Set(['BLACK', 'WHITE', 'BLUE', 'RED', 'GREEN', 'YELLOW', 'ORANGE', 'GREY', 'GRAY'])
 
-export function ColorInspectionPanel() {
+interface ColorInspectionPanelProps {
+  refreshTrigger?: number
+}
+
+export function ColorInspectionPanel({ refreshTrigger }: ColorInspectionPanelProps = {}) {
   const { image, activeVersion } = useInspection()
   const [checkpoints, setCheckpoints] = useState<EngineeringCheckpoint[]>([])
   const [selectedId, setSelectedId] = useState('')
@@ -43,7 +47,7 @@ export function ColorInspectionPanel() {
     }
   }, [])
 
-  useEffect(() => { void loadColourCheckpoints() }, [loadColourCheckpoints])
+  useEffect(() => { void loadColourCheckpoints() }, [loadColourCheckpoints, refreshTrigger])
 
   const selectedCheckpoint = useMemo(
     () => checkpoints.find((checkpoint) => checkpoint.checkpoint_id === selectedId) ?? null,

@@ -59,3 +59,20 @@ def delete_checkpoint(
     except CheckpointNotFoundError as exc:
         raise HTTPException(status_code=404, detail="Checkpoint not found") from exc
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/sync-from-golden", response_model=list[CheckpointRead], summary="Sync checkpoints from Golden Reference")
+def sync_checkpoints_from_golden(
+    model_id: str,
+    replace: bool = True,
+    scale_to_active_image: bool = True,
+    db: Session = Depends(get_db),
+) -> list[CheckpointRead]:
+    try:
+        return CheckpointService(db).sync_from_golden_reference(
+            model_id=model_id,
+            replace=replace,
+            scale_to_active_image=scale_to_active_image,
+        )  # type: ignore[return-value]
+    except ModelNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Product model not found") from exc

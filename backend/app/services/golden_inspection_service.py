@@ -133,6 +133,18 @@ class GoldenInspectionService:
             foreground_pixels = cv2.countNonZero(roi_mask) if roi_mask.size > 0 else 0
             component_detected = foreground_pixels >= max(6, int(roi_mask.size * 0.02))
 
+            if not component_detected:
+                search_radius = max(roi_w, 70)
+                s_rx = max(0, tx - search_radius)
+                s_ry = max(0, ty - search_radius)
+                s_rw = min(test_w - s_rx, search_radius * 2)
+                s_rh = min(test_h - s_ry, search_radius * 2)
+                s_roi_mask = test_mask[s_ry : s_ry + s_rh, s_rx : s_rx + s_rw]
+                if cv2.countNonZero(s_roi_mask) >= 6:
+                    component_detected = True
+                    rx, ry, rw, rh = s_rx, s_ry, s_rw, s_rh
+                    roi_mask = s_roi_mask
+
             # Calculate detected measurement
             if component_detected and expected is not None:
                 # Find nearest wire point to target (tx, ty) within ROI
