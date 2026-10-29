@@ -170,6 +170,7 @@ export function GoldenReferencePage() {
       })
       setSelectedId(null)
       setDraft(null)
+      setIsCreatingNew(false)
       setSuccessMessage(`Deleted checkpoint ${id}`)
       setTimeout(() => setSuccessMessage(null), 3000)
     } catch (err) {
@@ -198,13 +199,18 @@ export function GoldenReferencePage() {
     if (!config) return
     setIsCreatingNew(true)
     setSelectedId(null)
-    const nextNum = config.checkpoints.length + 1
+    const existingIds = new Set(config.checkpoints.map((c) => c.checkpoint_id))
+    let nextNum = config.checkpoints.length + 1
+    while (existingIds.has(`CP-T${String(nextNum).padStart(2, '0')}`) || existingIds.has(`CP-T${nextNum}`)) {
+      nextNum++
+    }
+    const termId = `T${String(nextNum).padStart(2, '0')}`
     const defaultX = initialX ?? Math.round(config.image_width / 2)
     const defaultY = initialY ?? Math.round(config.image_height / 2)
     setDraft({
-      checkpoint_id: `CP-T${nextNum}`,
+      checkpoint_id: `CP-${termId}`,
       type: 'terminal',
-      terminal_id: `T${nextNum}`,
+      terminal_id: termId,
       node_id: 'J01',
       branch_id: null,
       measurement_type: 'branch_length',
@@ -229,6 +235,7 @@ export function GoldenReferencePage() {
     } else {
       setSelectedId(null)
       setDraft(null)
+      setIsCreatingNew(false)
     }
   }
 
@@ -638,25 +645,75 @@ export function GoldenReferencePage() {
         <aside className="panel" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           <div className="panel-header">
             <div>
-              <p className="eyebrow">SPECIFICATION INSPECTOR</p>
+              <p className="eyebrow">{isCreatingNew ? 'NEW CHECKPOINT PLACEMENT' : 'SPECIFICATION INSPECTOR'}</p>
               <h2>{draft ? draft.checkpoint_id : 'Select Checkpoint'}</h2>
             </div>
-            {draft && (
+            {draft && !isCreatingNew && (
               <StatusPill tone={draft.status === 'CONFIRMED' ? 'pass' : 'warning'}>
                 {draft.status === 'CONFIRMED' ? 'CONFIRMED' : 'NEEDS CONFIRMATION'}
               </StatusPill>
+            )}
+            {isCreatingNew && (
+              <span
+                style={{
+                  fontSize: 10,
+                  fontWeight: 800,
+                  padding: '3px 8px',
+                  borderRadius: 4,
+                  background: '#0284c7',
+                  color: '#ffffff',
+                }}
+              >
+                PLACING MARKER
+              </span>
             )}
           </div>
 
           {draft ? (
             <div style={{ padding: 18, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {isCreatingNew && (
+                <div style={{ padding: '8px 12px', background: '#e0f2fe', borderRadius: 4, border: '1px solid #bae6fd', fontSize: 11, color: '#0369a1', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Info size={14} style={{ flexShrink: 0 }} />
+                  <span>Click on the harness image to reposition this marker ({draft.reference_x}, {draft.reference_y}).</span>
+                </div>
+              )}
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <label className="form-field">
+                  <span>Checkpoint ID</span>
+                  <input
+                    type="text"
+                    value={draft.checkpoint_id}
+                    onChange={(e) => setDraft({ ...draft, checkpoint_id: e.target.value })}
+                  />
+                </label>
+                <label className="form-field">
+                  <span>Type</span>
+                  <select
+                    value={draft.type}
+                    onChange={(e) => setDraft({ ...draft, type: e.target.value as any })}
+                    style={{ padding: '6px 10px', fontSize: 11, border: '1px solid var(--slate-300)', borderRadius: 3 }}
+                  >
+                    <option value="terminal">Terminal</option>
+                    <option value="node_distance">Joint / Node</option>
+                  </select>
+                </label>
+              </div>
+
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 <label className="form-field">
                   <span>Terminal ID</span>
                   <input
                     type="text"
                     value={draft.terminal_id || ''}
-                    onChange={(e) => setDraft({ ...draft, terminal_id: e.target.value || null })}
+                    onChange={(e) => {
+                      const val = e.target.value || null
+                      setDraft({
+                        ...draft,
+                        terminal_id: val,
+                        ...(isCreatingNew && val ? { checkpoint_id: `CP-${val}` } : {}),
+                      })
+                    }}
                   />
                 </label>
                 <label className="form-field">
@@ -738,17 +795,30 @@ export function GoldenReferencePage() {
               )}
 
               <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                <button className="button button--primary" onClick={handleSaveDraft} disabled={saving} style={{ flex: 1 }}>
-                  Save Checkpoint
-                </button>
-                <button
-                  className="button button--secondary"
-                  style={{ color: 'var(--red-600)' }}
-                  onClick={() => handleDeleteCheckpoint(draft.checkpoint_id)}
-                  title="Delete checkpoint"
-                >
-                  <Trash2 size={16} />
-                </button>
+                {isCreatingNew ? (
+                  <>
+                    <button className="button button--primary" onClick={handleSaveDraft} disabled={saving} style={{ flex: 1 }}>
+                      + Add Checkpoint
+                    </button>
+                    <button className="button button--secondary" onClick={handleCancelNew} style={{ flex: 1 }}>
+                      Cancel
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button className="button button--primary" onClick={handleSaveDraft} disabled={saving} style={{ flex: 1 }}>
+                      Save Checkpoint
+                    </button>
+                    <button
+                      className="button button--secondary"
+                      style={{ color: 'var(--red-600)', display: 'flex', alignItems: 'center', gap: 6, padding: '0 12px' }}
+                      onClick={() => handleDeleteCheckpoint(draft.checkpoint_id)}
+                      title="Delete checkpoint"
+                    >
+                      <Trash2 size={15} /> Delete Checkpoint
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           ) : (
@@ -759,6 +829,18 @@ export function GoldenReferencePage() {
 
           {/* Quick Filter & Checkpoint List */}
           <div style={{ borderTop: '1px solid var(--slate-200)', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 240 }}>
+            <div style={{ padding: '8px 12px', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--slate-200)' }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--slate-700)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                All Checkpoints ({config?.checkpoints.length ?? 0})
+              </span>
+              <button
+                className="button button--primary"
+                style={{ padding: '3px 8px', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}
+                onClick={() => handleStartAddNew()}
+              >
+                <Plus size={13} /> Add Checkpoint
+              </button>
+            </div>
             <div style={{ padding: '8px 12px', background: '#f8fafc', display: 'flex', gap: 8, borderBottom: '1px solid var(--slate-200)' }}>
               <input
                 type="text"
@@ -788,6 +870,7 @@ export function GoldenReferencePage() {
                       <tr
                         key={cp.checkpoint_id}
                         onClick={() => {
+                          setIsCreatingNew(false)
                           setSelectedId(cp.checkpoint_id)
                           setDraft({ ...cp })
                         }}
@@ -819,7 +902,7 @@ export function GoldenReferencePage() {
                         </td>
                         <td style={{ padding: '6px 8px', color: 'var(--slate-600)' }}>{cp.expected_value} mm</td>
                         <td style={{ padding: '6px 8px', color: 'var(--slate-500)' }}>±{cp.tolerance} mm</td>
-                        <td style={{ padding: '6px 12px', textAlign: 'right' }}>
+                        <td style={{ padding: '6px 8px', textAlign: 'right' }}>
                           <span
                             style={{
                               fontSize: 9,
@@ -832,6 +915,30 @@ export function GoldenReferencePage() {
                           >
                             {cp.status === 'CONFIRMED' ? 'OK' : 'CONFIRM'}
                           </span>
+                        </td>
+                        <td style={{ padding: '6px 8px', textAlign: 'center', width: 28 }}>
+                          <button
+                            type="button"
+                            title={`Delete ${cp.checkpoint_id}`}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleDeleteCheckpoint(cp.checkpoint_id)
+                            }}
+                            style={{
+                              background: 'transparent',
+                              border: 'none',
+                              color: 'var(--slate-400)',
+                              cursor: 'pointer',
+                              padding: 2,
+                              borderRadius: 3,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                            }}
+                            onMouseEnter={(e) => (e.currentTarget.style.color = '#dc2626')}
+                            onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--slate-400)')}
+                          >
+                            <Trash2 size={13} />
+                          </button>
                         </td>
                       </tr>
                     )
