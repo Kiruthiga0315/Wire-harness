@@ -55,6 +55,13 @@ def initialize_database() -> None:
 
     with SessionLocal() as session:
         seed_demo_data(session)
+        try:
+            from app.services.checkpoint_service import checkpoint_service
+            checkpoint_service.sync_from_golden_reference(
+                session, "DEMO-HARNESS-001", replace=True, scale_to_active_image=True
+            )
+        except Exception as exc:
+            logger.warning("Auto-sync of golden checkpoints skipped during init: %s", exc)
 
     if settings.database_url.startswith("sqlite"):
         with engine.begin() as connection:

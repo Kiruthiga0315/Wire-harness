@@ -87,6 +87,12 @@ class ActiveImageService:
             meta_file = cache_dir / CACHE_META_FILENAME
             if not data_file.is_file() or not meta_file.is_file():
                 return None
+            demo_path = resolve_demo_image()
+            if demo_path and demo_path.is_file():
+                if demo_path.stat().st_mtime > data_file.stat().st_mtime:
+                    logger.info("Demo image updated; invalidating stale active image cache")
+                    self._clear_cache()
+                    return None
             meta = json.loads(meta_file.read_text(encoding="utf-8"))
             data = data_file.read_bytes()
             bgr_image = decode_uploaded_image(
