@@ -18,7 +18,6 @@ import { StatusPill } from '../components/StatusPill'
 import {
   API_BASE_URL,
   GOLDEN_HARNESS_URL,
-  GOLDEN_SHEET_URL,
   addGoldenCheckpoint,
   deleteGoldenCheckpoint,
   getGoldenReference,
@@ -35,11 +34,12 @@ export function GoldenReferencePage() {
   const [error, setError] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
-  // Active view: 'harness' | 'sheet' | 'calibration'
-  const [activeTab, setActiveTab] = useState<'harness' | 'sheet' | 'calibration'>('harness')
+  // Active view: 'harness' | 'calibration'
+  const [activeTab, setActiveTab] = useState<'harness' | 'calibration'>('harness')
 
   // Selected checkpoint for editing
   const [selectedId, setSelectedId] = useState<string | null>('CP-T01')
+  const [isCreatingNew, setIsCreatingNew] = useState(false)
   const [filterCategory, setFilterCategory] = useState<'all' | 'terminal' | 'node_distance' | 'unconfirmed'>('all')
   const [searchTerm, setSearchTerm] = useState('')
 
@@ -107,18 +107,26 @@ export function GoldenReferencePage() {
     setSaving(true)
     setError(null)
     try {
-      const updated = await updateGoldenCheckpoint(draft.checkpoint_id, draft)
-      setConfig((prev) => {
-        if (!prev) return null
-        return {
-          ...prev,
-          checkpoints: prev.checkpoints.map((c) => (c.checkpoint_id === updated.checkpoint_id ? updated : c)),
-        }
-      })
-      setSuccessMessage(`Saved checkpoint ${draft.checkpoint_id}`)
+      if (isCreatingNew) {
+        const added = await addGoldenCheckpoint(draft)
+        setConfig((prev) => (prev ? { ...prev, checkpoints: [...prev.checkpoints, added] } : null))
+        setSelectedId(added.checkpoint_id)
+        setIsCreatingNew(false)
+        setSuccessMessage(`Created new checkpoint ${added.checkpoint_id}`)
+      } else {
+        const updated = await updateGoldenCheckpoint(draft.checkpoint_id, draft)
+        setConfig((prev) => {
+          if (!prev) return null
+          return {
+            ...prev,
+            checkpoints: prev.checkpoints.map((c) => (c.checkpoint_id === updated.checkpoint_id ? updated : c)),
+          }
+        })
+        setSuccessMessage(`Saved checkpoint ${draft.checkpoint_id}`)
+      }
       setTimeout(() => setSuccessMessage(null), 3000)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error updating checkpoint.')
+      setError(err instanceof Error ? err.message : 'Error saving checkpoint.')
     } finally {
       setSaving(false)
     }
@@ -186,6 +194,44 @@ export function GoldenReferencePage() {
     }
   }
 
+  const handleStartAddNew = (initialX?: number, initialY?: number) => {
+    if (!config) return
+    setIsCreatingNew(true)
+    setSelectedId(null)
+    const nextNum = config.checkpoints.length + 1
+    const defaultX = initialX ?? Math.round(config.image_width / 2)
+    const defaultY = initialY ?? Math.round(config.image_height / 2)
+    setDraft({
+      checkpoint_id: `CP-T${nextNum}`,
+      type: 'terminal',
+      terminal_id: `T${nextNum}`,
+      node_id: 'J01',
+      branch_id: null,
+      measurement_type: 'branch_length',
+      expected_value: 150.0,
+      unit: 'mm',
+      tolerance: 15.0,
+      reference_x: defaultX,
+      reference_y: defaultY,
+      roi_width: 45,
+      roi_height: 45,
+      confidence: 0.95,
+      status: 'CONFIRMED',
+      notes: 'Manually placed checkpoint',
+    })
+  }
+
+  const handleCancelNew = () => {
+    setIsCreatingNew(false)
+    if (config && config.checkpoints.length > 0) {
+      setSelectedId(config.checkpoints[0].checkpoint_id)
+      setDraft({ ...config.checkpoints[0] })
+    } else {
+      setSelectedId(null)
+      setDraft(null)
+    }
+  }
+
   const handleImageClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!config || (activeTab !== 'harness' && activeTab !== 'calibration')) return
     const rect = e.currentTarget.getBoundingClientRect()
@@ -205,8 +251,8 @@ export function GoldenReferencePage() {
       return
     }
 
-    // If draft is open, move selected coordinate
-    if (draft) {
+    // If currently creating a new checkpoint, move the marker to the clicked position
+    if (isCreatingNew && draft) {
       setDraft({
         ...draft,
         reference_x: imgX,
@@ -215,36 +261,8 @@ export function GoldenReferencePage() {
       return
     }
 
-    // Otherwise create new checkpoint
-    const nextNum = config.checkpoints.length + 1
-    const newId = `CP-CUSTOM-${String(nextNum).padStart(2, '0')}`
-    const newCp: GoldenCheckpoint = {
-      checkpoint_id: newId,
-      type: 'terminal',
-      terminal_id: `T${nextNum}`,
-      node_id: null,
-      branch_id: null,
-      measurement_type: 'branch_length',
-      expected_value: 150.0,
-      unit: 'mm',
-      tolerance: 15.0,
-      reference_x: imgX,
-      reference_y: imgY,
-      roi_width: 45,
-      roi_height: 45,
-      confidence: 0.95,
-      status: 'CONFIRMED',
-      notes: 'Manually placed checkpoint',
-    }
-    void (async () => {
-      try {
-        const added = await addGoldenCheckpoint(newCp)
-        setConfig((prev) => (prev ? { ...prev, checkpoints: [...prev.checkpoints, added] } : null))
-        setSelectedId(added.checkpoint_id)
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to add checkpoint')
-      }
-    })()
+    // Otherwise, clicking on the image initiates adding a new checkpoint right at that location
+    handleStartAddNew(imgX, imgY)
   }
 
   const handleSaveCalibration = async () => {
@@ -368,7 +386,7 @@ export function GoldenReferencePage() {
           <strong style={{ color: config?.specification_summary.unconfirmed_count ? 'var(--amber-600)' : 'inherit' }}>
             {config?.specification_summary.unconfirmed_count ?? 4}
           </strong>
-          <small>Uncertain sheet readings</small>
+          <small>Pending review</small>
         </article>
         <article>
           <span>Calibration Scale</span>
@@ -389,13 +407,6 @@ export function GoldenReferencePage() {
                 onClick={() => setActiveTab('harness')}
               >
                 <FileText size={14} /> Golden Harness (Annotated)
-              </button>
-              <button
-                className={`button ${activeTab === 'sheet' ? 'button--primary' : 'button--secondary'}`}
-                style={{ padding: '6px 12px', fontSize: 11 }}
-                onClick={() => setActiveTab('sheet')}
-              >
-                <FileText size={14} /> Handwritten Sheet
               </button>
               <button
                 className={`button ${activeTab === 'calibration' ? 'button--primary' : 'button--secondary'}`}
@@ -475,6 +486,7 @@ export function GoldenReferencePage() {
                       key={cp.checkpoint_id}
                       onClick={(e) => {
                         e.stopPropagation()
+                        setIsCreatingNew(false)
                         setSelectedId(cp.checkpoint_id)
                         setDraft({ ...cp })
                       }}
@@ -520,27 +532,50 @@ export function GoldenReferencePage() {
                     </div>
                   )
                 })}
-              </div>
-            </div>
-          )}
 
-          {activeTab === 'sheet' && (
-            <div
-              style={{
-                height: 720,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                background: '#101922',
-                overflow: 'auto',
-                padding: 16,
-              }}
-            >
-              <img
-                src={GOLDEN_SHEET_URL}
-                alt="Handwritten measurement specification sheet"
-                style={{ maxHeight: '100%', maxWidth: '100%', objectFit: 'contain', borderRadius: 4 }}
-              />
+                {/* Live Preview for New Checkpoint being placed */}
+                {isCreatingNew && draft && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      left: `${(draft.reference_x / (config?.image_width ?? 357)) * 100}%`,
+                      top: `${(draft.reference_y / (config?.image_height ?? 767)) * 100}%`,
+                      transform: 'translate(-50%, -50%)',
+                      zIndex: 40,
+                      pointerEvents: 'none',
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 18,
+                        height: 18,
+                        borderRadius: '50%',
+                        background: draft.type === 'node_distance' ? '#ef4444' : '#22c55e',
+                        border: '3px solid #ffffff',
+                        boxShadow: '0 0 0 4px #0284c7, 0 2px 8px rgba(0,0,0,0.8)',
+                      }}
+                    />
+                    <span
+                      style={{
+                        position: 'absolute',
+                        left: 16,
+                        top: -8,
+                        background: '#0284c7',
+                        color: '#ffffff',
+                        fontSize: 10,
+                        fontWeight: 800,
+                        padding: '2px 6px',
+                        borderRadius: 4,
+                        whiteSpace: 'nowrap',
+                        border: '1px solid #ffffff',
+                        boxShadow: '0 2px 6px rgba(0,0,0,0.6)',
+                      }}
+                    >
+                      + NEW: {draft.terminal_id || draft.node_id || draft.checkpoint_id}
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -675,7 +710,7 @@ export function GoldenReferencePage() {
               </div>
 
               <label className="form-field">
-                <span>Engineering & Handwritten Notes</span>
+                <span>Engineering Notes</span>
                 <textarea
                   rows={2}
                   value={draft.notes || ''}
