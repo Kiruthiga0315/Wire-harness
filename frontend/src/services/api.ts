@@ -513,3 +513,26 @@ export async function downloadDemoReportPdf(): Promise<void> {
     throw new ApiError('PDF export unavailable. Check that the backend is running.')
   }
 }
+
+export async function downloadGoldenReportPdf(): Promise<void> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/golden-reference/export/pdf`, { cache: 'no-store' })
+    if (!response.ok) {
+      throw new ApiError('PDF report could not be generated.', response.status)
+    }
+    const blob = await response.blob()
+    const disposition = response.headers.get('Content-Disposition') ?? ''
+    const filename = disposition.match(/filename="([^"]+)"/)?.[1] ?? 'golden-reference-inspection-report.pdf'
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = filename
+    document.body.appendChild(anchor)
+    anchor.click()
+    anchor.remove()
+    URL.revokeObjectURL(url)
+  } catch (error) {
+    if (error instanceof ApiError) throw error
+    throw new ApiError('Unable to download PDF inspection certificate.')
+  }
+}

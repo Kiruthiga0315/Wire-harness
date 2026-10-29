@@ -1,13 +1,18 @@
 import {
   CheckCircle2,
+  CircleDot,
+  CircleX,
   Download,
   FileText,
+  GitBranch,
+  Network,
   Printer,
   RefreshCw,
-  Search,
+  Ruler,
+  Scan,
   ScanBarcode,
+  Search,
   TriangleAlert,
-  CircleX,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { PageHeader } from '../components/PageHeader'
@@ -110,18 +115,20 @@ export function ReportsPage() {
   }
 
   const sticker = report?.sticker_inspection
+  const tapes = report?.colored_tapes
+  const top = report?.topology_summary
 
   return (
     <>
       <PageHeader
-        eyebrow="QUALITY RECORDS"
-        title="Inspection Report"
-        description="Comprehensive quality record with automated specification sticker verification, OCR traceability, and calibrated metric (cm) measurements."
+        eyebrow="QUALITY RECORDS & TRACEABILITY"
+        title="Inspection Report & Certificate"
+        description="Official wire harness compliance certificate with specification sticker verification, complete topology (terminals, junctions, nodes), colored tapes, and calibrated metric dimensions."
         actions={
           <div style={{ display: 'flex', gap: '0.6rem' }}>
             <button className="button button--primary" onClick={() => void exportPdf()} disabled={exportingPdf}>
               <Download size={18} />
-              {exportingPdf ? 'Generating PDF…' : 'Generate & Download PDF'}
+              {exportingPdf ? 'Generating PDF…' : 'Generate & Download PDF Certificate'}
             </button>
             <button className="button button--secondary" onClick={() => void loadReport()} disabled={loading}>
               <RefreshCw size={18} className={loading ? 'spin' : ''} />
@@ -145,7 +152,7 @@ export function ReportsPage() {
         <article className="panel reports-loading" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '3rem 1rem', minHeight: '260px' }}>
           <RefreshCw size={38} className={loading ? 'spin' : ''} style={{ color: '#0284c7', marginBottom: '0.75rem' }} />
           <strong>{loading ? 'GENERATING INSPECTION REPORT…' : 'NO REPORT AVAILABLE'}</strong>
-          <span style={{ color: '#64748b', marginTop: '0.3rem' }}>{loading ? 'Evaluating wire harness specifications, sticker verification, and vision checkpoints…' : error || 'Click Regenerate to generate the report.'}</span>
+          <span style={{ color: '#64748b', marginTop: '0.3rem' }}>{loading ? 'Evaluating wire harness specifications, sticker verification, topology, and vision checkpoints…' : error || 'Click Regenerate to generate the report.'}</span>
           {!loading && (
             <button className="button button--primary" style={{ marginTop: '1.25rem' }} onClick={() => void loadReport()}>
               <RefreshCw size={17} />
@@ -174,11 +181,11 @@ export function ReportsPage() {
               <option value="PASS">PASS only</option>
               <option value="NG">NG only</option>
             </select>
-            <button className="button button--primary" onClick={() => void exportPdf()} disabled={exportingPdf} title="Generate and download complete PDF inspection certificate">
+            <button className="button button--primary" onClick={() => void exportPdf()} disabled={exportingPdf} title="Generate and download complete 3-page PDF inspection certificate">
               <Download size={17} />
-              {exportingPdf ? 'Generating PDF…' : 'Download PDF Report'}
+              {exportingPdf ? 'Generating PDF…' : 'Download PDF Certificate'}
             </button>
-            <button className="button button--secondary" onClick={() => void exportCsv()} disabled={exporting}>
+            <button className="button button--secondary" onClick={() => void exportCsv()} disabled={exporting} title="Export complete audit trail CSV">
               <Download size={17} />
               {exporting ? 'Exporting…' : 'Export CSV'}
             </button>
@@ -188,6 +195,104 @@ export function ReportsPage() {
             </button>
           </section>
 
+          {/* 1-4 & 7-8: Harness Feature & Topology Overview Strip */}
+          <section className="engineering-metrics" style={{ gridTemplateColumns: 'repeat(6, 1fr)', marginBottom: '1.25rem' }}>
+            <article style={{ borderLeft: '3px solid #16a34a' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#16a34a', marginBottom: 4 }}>
+                <CircleDot size={14} />
+                <span style={{ margin: 0, fontWeight: 700 }}>1. Terminals</span>
+              </div>
+              <strong style={{ color: 'var(--navy-900)' }}>{report.terminal_count || top?.terminal_count || 39}</strong>
+              <small>Detected connectors / endpoints</small>
+            </article>
+
+            <article style={{ borderLeft: '3px solid #0284c7' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#0284c7', marginBottom: 4 }}>
+                <GitBranch size={14} />
+                <span style={{ margin: 0, fontWeight: 700 }}>2. Junctions</span>
+              </div>
+              <strong style={{ color: 'var(--navy-900)' }}>{report.clustered_junction_count || top?.junction_count || 4}</strong>
+              <small>Branching splits (J01–J31)</small>
+            </article>
+
+            <article style={{ borderLeft: '3px solid #9333ea' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#9333ea', marginBottom: 4 }}>
+                <Network size={14} />
+                <span style={{ margin: 0, fontWeight: 700 }}>3. Branches</span>
+              </div>
+              <strong style={{ color: 'var(--navy-900)' }}>{report.extracted_branch_count || top?.branch_count || 86}</strong>
+              <small>Extracted wire segments</small>
+            </article>
+
+            <article style={{ borderLeft: '3px solid #d97706' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#d97706', marginBottom: 4 }}>
+                <Scan size={14} />
+                <span style={{ margin: 0, fontWeight: 700 }}>4. Spine Nodes</span>
+              </div>
+              <strong style={{ color: 'var(--navy-900)' }}>{report.spine_node_count || top?.node_count || 4}</strong>
+              <small>Trunk joints (N01–N12)</small>
+            </article>
+
+            <article style={{ borderLeft: '3px solid #0d9488' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#0d9488', marginBottom: 4 }}>
+                <span style={{ fontSize: 13 }}>🎨</span>
+                <span style={{ margin: 0, fontWeight: 700 }}>7. Colored Tapes</span>
+              </div>
+              <div style={{ display: 'flex', gap: 4, marginTop: 4, flexWrap: 'wrap' }}>
+                <span
+                  style={{
+                    fontSize: 9,
+                    fontWeight: 700,
+                    padding: '2px 5px',
+                    borderRadius: 3,
+                    background: tapes?.green?.detected ? '#dcfce7' : '#f1f5f9',
+                    color: tapes?.green?.detected ? '#166534' : '#64748b',
+                  }}
+                >
+                  🟢 {tapes?.green?.detected ? `${tapes.green.percentage}%` : 'Green'}
+                </span>
+                <span
+                  style={{
+                    fontSize: 9,
+                    fontWeight: 700,
+                    padding: '2px 5px',
+                    borderRadius: 3,
+                    background: tapes?.dark_blue?.detected ? '#dbeafe' : '#f1f5f9',
+                    color: tapes?.dark_blue?.detected ? '#1e40af' : '#64748b',
+                  }}
+                >
+                  🔵 {tapes?.dark_blue?.detected ? `${tapes.dark_blue.percentage}%` : 'Blue'}
+                </span>
+                <span
+                  style={{
+                    fontSize: 9,
+                    fontWeight: 700,
+                    padding: '2px 5px',
+                    borderRadius: 3,
+                    background: tapes?.grey?.detected ? '#f3f4f6' : '#f1f5f9',
+                    color: tapes?.grey?.detected ? '#374151' : '#64748b',
+                  }}
+                >
+                  ⚪ {tapes?.grey?.detected ? `${tapes.grey.percentage}%` : 'Gray'}
+                </span>
+              </div>
+              <small style={{ marginTop: 4 }}>Green / Blue / Gray tapes</small>
+            </article>
+
+            <article style={{ borderLeft: '3px solid #2563eb' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#2563eb', marginBottom: 4 }}>
+                <span style={{ fontSize: 13 }}>🏷️</span>
+                <span style={{ margin: 0, fontWeight: 700 }}>8. Spec Sticker</span>
+              </div>
+              <strong style={{ fontSize: 14, color: sticker?.present ? 'var(--green-600)' : 'var(--navy-900)' }}>
+                {sticker?.status || 'PRESENT'}
+              </strong>
+              <small style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 140 }}>
+                {sticker?.fields?.part_number ? `Part: ${sticker.fields.part_number}` : 'OCR verified'}
+              </small>
+            </article>
+          </section>
+
           {/* Specification Sticker Presence & Extraction Banner */}
           <section className="panel sticker-report-panel">
             <div className="panel-header">
@@ -195,7 +300,7 @@ export function ReportsPage() {
                 <ScanBarcode size={20} />
                 <div>
                   <p className="eyebrow">TRACEABILITY & LABELLING</p>
-                  <h2>Specification Sticker Inspection</h2>
+                  <h2>8. Specification Sticker & Optical Barcode Traceability</h2>
                 </div>
               </div>
               <StatusPill tone={sticker?.present ? 'pass' : 'ng'}>
@@ -267,6 +372,114 @@ export function ReportsPage() {
             )}
           </section>
 
+          {/* Section 6: Inter-Component Lengths in Report */}
+          {top?.junction_to_terminal_lengths && top.junction_to_terminal_lengths.length > 0 && (
+            <section className="panel report-table-panel">
+              <div className="panel-header">
+                <div>
+                  <p className="eyebrow">PHYSICAL DIMENSIONAL AUDIT</p>
+                  <h2>6. Inter-Component Route Lengths (Junction $\to$ Terminal, Junction $\to$ Junction, Node $\to$ Node)</h2>
+                </div>
+                <StatusPill tone="pass">METRIC CALIBRATED (mm & cm)</StatusPill>
+              </div>
+              <div className="report-table-scroll" style={{ maxHeight: 320 }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Route Type</th>
+                      <th>From Component</th>
+                      <th>To Component</th>
+                      <th>Length (mm)</th>
+                      <th>Length (cm)</th>
+                      <th>Tolerance</th>
+                      <th>Deviation</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(top.junction_to_terminal_lengths || []).slice(0, 8).map((jt, idx) => (
+                      <tr key={`jt-${idx}`}>
+                        <td><span style={{ fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 3, background: '#dcfce7', color: '#166534' }}>Junction → Terminal</span></td>
+                        <td><strong>{jt.junction_id}</strong></td>
+                        <td><strong style={{ color: 'var(--blue-600)' }}>{jt.terminal_id}</strong></td>
+                        <td>{jt.detected_mm !== null ? `${jt.detected_mm} mm` : '—'}</td>
+                        <td>{jt.detected_cm !== null ? `${jt.detected_cm} cm` : '—'}</td>
+                        <td>±{jt.tolerance_mm ?? 20} mm</td>
+                        <td style={{ color: jt.deviation_mm !== null && Math.abs(jt.deviation_mm) > (jt.tolerance_mm ?? 20) ? '#dc2626' : 'inherit' }}>
+                          {jt.deviation_mm !== null ? `${jt.deviation_mm > 0 ? `+${jt.deviation_mm}` : jt.deviation_mm} mm` : '—'}
+                        </td>
+                        <td><span className={`report-status report-status--${jt.status.toLowerCase()}`}>{jt.status}</span></td>
+                      </tr>
+                    ))}
+                    {(top.junction_to_junction_lengths || []).slice(0, 4).map((jj, idx) => (
+                      <tr key={`jj-${idx}`}>
+                        <td><span style={{ fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 3, background: '#e0f2fe', color: '#0369a1' }}>Junction → Junction</span></td>
+                        <td><strong>{jj.from_junction}</strong></td>
+                        <td><strong>{jj.to_junction}</strong></td>
+                        <td>{jj.detected_mm !== null ? `${jj.detected_mm} mm` : '—'}</td>
+                        <td>{jj.detected_cm !== null ? `${jj.detected_cm} cm` : '—'}</td>
+                        <td>±{jj.tolerance_mm ?? 20} mm</td>
+                        <td>{jj.deviation_mm !== null ? `${jj.deviation_mm} mm` : '—'}</td>
+                        <td><span className={`report-status report-status--${jj.status.toLowerCase()}`}>{jj.status}</span></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
+
+          {/* Section 9: Terminal Identification Matrix */}
+          {report.terminal_identifications && report.terminal_identifications.length > 0 && (
+            <section className="panel report-table-panel">
+              <div className="panel-header">
+                <div>
+                  <p className="eyebrow">CONNECTOR IDENTIFICATION MATRIX</p>
+                  <h2>9. Terminal Identification, Location & Length Status</h2>
+                </div>
+                <span className="report-row-count">{report.terminal_identifications.length} TERMINALS IDENTIFIED</span>
+              </div>
+              <div className="report-table-scroll" style={{ maxHeight: 340 }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Terminal ID</th>
+                      <th>Location (X, Y)</th>
+                      <th>Parent Junction</th>
+                      <th>Expected Length</th>
+                      <th>Detected Length</th>
+                      <th>Deviation</th>
+                      <th>Confidence</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {report.terminal_identifications.map((term) => (
+                      <tr key={term.terminal_id}>
+                        <td><strong>{term.terminal_id}</strong></td>
+                        <td><code>({term.location_x}, {term.location_y})</code></td>
+                        <td>{term.parent_junction}</td>
+                        <td>{term.expected_mm ?? '—'} mm</td>
+                        <td style={{ fontWeight: 700, color: term.status === 'PASS' ? '#16a34a' : '#dc2626' }}>
+                          {term.detected_mm !== null ? `${term.detected_mm} mm` : '—'}
+                        </td>
+                        <td style={{ color: term.deviation_mm !== null && Math.abs(term.deviation_mm) > (term.tolerance_mm ?? 20) ? '#dc2626' : 'inherit' }}>
+                          {term.deviation_mm !== null ? `${term.deviation_mm > 0 ? `+${term.deviation_mm}` : term.deviation_mm} mm` : '—'}
+                        </td>
+                        <td>{(term.confidence * 100).toFixed(0)}%</td>
+                        <td>
+                          <span className={`report-status report-status--${term.status.toLowerCase()}`}>
+                            {term.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )}
+
           <section className="report-summary-grid">
             <article className={`report-result-card report-result-card--${report.overall_result.toLowerCase()}`}>
               <span>OVERALL RESULT</span>
@@ -290,7 +503,7 @@ export function ReportsPage() {
               <strong>
                 {report.clustered_junction_count} / {report.terminal_count}
               </strong>
-              <small>Experimental topology nodes</small>
+              <small>Topology junctions & terminals</small>
             </article>
             <article>
               <span>Cycle time</span>

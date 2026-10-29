@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -45,9 +45,13 @@ class InspectionReportResponse(BaseModel):
     extracted_branch_count: int = Field(ge=0)
     clustered_junction_count: int = Field(ge=0)
     terminal_count: int = Field(ge=0)
+    spine_node_count: int = 4
     unresolved_segment_count: int = Field(ge=0)
     annotated_image: str
     checkpoint_results: list[MockCheckpointResult]
     branch_measurements: list[ReportBranchMeasurement]
     sticker_inspection: StickerInspectionReport
+    colored_tapes: dict[str, Any] | None = None
+    topology_summary: dict[str, Any] | None = None
+    terminal_identifications: list[dict[str, Any]] | None = None
     disclaimer: str

@@ -1,4 +1,9 @@
 import type { MockCheckpointResult } from './inspection'
+import type {
+  ColoredTapeSummary,
+  TerminalIdentification,
+  TopologySummary,
+} from './goldenReference'
 
 export interface ReportBranchMeasurement {
   branch_id: string
@@ -56,10 +61,14 @@ export interface InspectionReportResponse {
   extracted_branch_count: number
   clustered_junction_count: number
   terminal_count: number
+  spine_node_count?: number
   unresolved_segment_count: number
   annotated_image: string
   checkpoint_results: MockCheckpointResult[]
   branch_measurements: ReportBranchMeasurement[]
   sticker_inspection: StickerInspectionReport
+  colored_tapes?: ColoredTapeSummary
+  topology_summary?: TopologySummary
+  terminal_identifications?: TerminalIdentification[]
   disclaimer: string
 }

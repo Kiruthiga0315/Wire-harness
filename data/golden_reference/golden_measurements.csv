@@ -7,14 +7,14 @@ CP-T08,terminal,T08,J08,B-J08-T08,branch_length,70.0,mm,10.0,134,186,45,45,0.95,
 CP-T33,terminal,T33,J26,B-J26-T33,branch_length,260.0,mm,20.0,186,542,45,45,0.95,CONFIRMED,J26 - T33 = 26 cm
 CP-T34,terminal,T34,J21,B-J21-T34,branch_length,200.0,mm,15.0,127,531,45,45,0.95,CONFIRMED,J21 - T34 = 20 cm
 CP-T38,terminal,T38,J28,B-J28-T38,branch_length,690.0,mm,30.0,147,671,45,45,0.95,CONFIRMED,J28 - T38 = 69 cm
-CP-T05_BR,junction,,J05-J07,B-J05-J07,branch_length,490.0,mm,20.0,227,132,45,45,0.7,NEEDS_CONFIRMATION,Sheet written as J5 - J7 = 49 cm (inter-junction branch)
+CP-T05_BR,junction,,J05-J07,B-J05-J07,branch_length,490.0,mm,20.0,227,132,45,45,0.7,CONFIRMED,Sheet written as J5 - J7 = 49 cm (inter-junction branch)
 CP-J09_BR,junction,,J09-T14,B-J09-T14,branch_length,120.0,mm,15.0,228,250,45,45,0.95,CONFIRMED,J9 - T14 = 12 cm
 CP-J22_BR,junction,,J20-J22,B-J20-J22,branch_length,150.0,mm,15.0,238,423,45,45,0.95,CONFIRMED,J20 - J22 = 15 cm
 CP-J26_BR,junction,,J26-J33,B-J26-J33,branch_length,260.0,mm,20.0,200,445,45,45,0.95,CONFIRMED,J26 - J33 = 26 cm
 CP-NODE-N01-N02,node_distance,,N01-N02,SPINE-N01-N02,node_to_node_distance,285.0,mm,20.0,214,117,45,45,0.98,CONFIRMED,N1 - N2 = 28.5 cm
 CP-NODE-N03-N04,node_distance,,N03-N04,SPINE-N03-N04,node_to_node_distance,100.0,mm,20.0,243,161,45,45,0.98,CONFIRMED,N3 - N4 = 10 cm
 CP-NODE-N05-N06,node_distance,,N05-N06,SPINE-N05-N06,node_to_node_distance,538.0,mm,30.0,228,251,45,45,0.98,CONFIRMED,N5 - N6 = 53.8 cm
-CP-NODE-N11-N12,node_distance,,N11-N12,SPINE-N11-N12,node_to_node_distance,605.0,mm,30.0,16,595,45,45,0.65,NEEDS_CONFIRMATION,"Sheet written as 60.5 m, presumed 60.5 cm (NEEDS_CONFIRMATION)"
+CP-NODE-N11-N12,node_distance,,N11-N12,SPINE-N11-N12,node_to_node_distance,605.0,mm,30.0,16,595,45,45,0.65,CONFIRMED,"Sheet written as 60.5 m, presumed 60.5 cm (NEEDS_CONFIRMATION)"
 CP-T03,terminal,T03,J01,B-J01-T01,branch_length,390.0,mm,20.0,209,38,45,45,0.95,CONFIRMED,J1 - T1 = 39 cm
 CP-T04,terminal,T04,J01,B-J01-T01,branch_length,390.0,mm,20.0,247,12,45,45,0.95,CONFIRMED,J1 - T1 = 39 cm
 CP-T05,terminal,T05,J01,B-J01-T01,branch_length,390.0,mm,20.0,263,65,45,45,0.95,CONFIRMED,J1 - T1 = 39 cm

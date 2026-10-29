@@ -128,6 +128,27 @@ def export_json() -> dict[str, Any]:
     return golden_reference_service.get_configuration()
 
 
+@router.get("/export/pdf", summary="Export golden reference inspection report as PDF")
+def export_golden_pdf() -> Response:
+    active = active_image_service.get_active_image()
+    if active is None or active.bgr_image is None:
+        raise HTTPException(status_code=400, detail="No active test image loaded.")
+
+    from app.services.pdf_report_service import pdf_report_service
+    from app.api.routes.reports import get_demo_report
+    from app.core.database import SessionLocal
+
+    with SessionLocal() as db:
+        report_response = get_demo_report(db)
+        pdf_bytes = pdf_report_service.generate_pdf(report_response)
+        filename = f"golden_inspection_{report_response.report_id}.pdf"
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+
+
 @router.get("/images/{image_name}", summary="Get golden reference image assets")
 def get_golden_image(image_name: str) -> FileResponse:
     allowed = {
@@ -144,7 +165,9 @@ def get_golden_image(image_name: str) -> FileResponse:
 
 
 @router.post("/inspect", summary="Inspect active workpiece or uploaded image against Golden Reference")
-def inspect_against_golden(payload: InspectRequest) -> dict[str, Any]:
+def inspect_against_golden(payload: InspectRequest | None = None) -> dict[str, Any]:
+    if payload is None:
+        payload = InspectRequest()
     active = active_image_service.get_active_image()
     if active is None or active.bgr_image is None:
         raise HTTPException(status_code=400, detail="No active test image loaded. Upload an image first.")
@@ -190,6 +213,10 @@ def inspect_against_golden(payload: InspectRequest) -> dict[str, Any]:
                 for r in result.results
             ],
             "summary_notes": result.summary_notes,
+            "topology_summary": result.topology_summary,
+            "colored_tapes": result.colored_tapes,
+            "sticker": result.sticker,
+            "terminal_identifications": result.terminal_identifications,
         }
     except Exception as exc:
         raise HTTPException(status_code=422, detail=f"Inspection failed: {exc}") from exc
@@ -237,6 +264,10 @@ async def inspect_uploaded_image(file: UploadFile = File(...)) -> dict[str, Any]
                 for r in result.results
             ],
             "summary_notes": result.summary_notes,
+            "topology_summary": result.topology_summary,
+            "colored_tapes": result.colored_tapes,
+            "sticker": result.sticker,
+            "terminal_identifications": result.terminal_identifications,
         }
     except Exception as exc:
         raise HTTPException(status_code=422, detail=f"Inspection failed: {exc}") from exc

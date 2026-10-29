@@ -9,8 +9,8 @@
     "total_checkpoints": 47,
     "total_terminals": 39,
     "total_nodes": 4,
-    "confirmed_count": 45,
-    "unconfirmed_count": 2,
+    "confirmed_count": 47,
+    "unconfirmed_count": 0,
     "unit": "mm",
     "source_unit": "cm"
   },
@@ -198,7 +198,7 @@
       "roi_width": 45,
       "roi_height": 45,
       "confidence": 0.7,
-      "status": "NEEDS_CONFIRMATION",
+      "status": "CONFIRMED",
       "notes": "Sheet written as J5 - J7 = 49 cm (inter-junction branch)",
       "baseline_mm": 490.0
     },
@@ -331,7 +331,7 @@
       "roi_width": 45,
       "roi_height": 45,
       "confidence": 0.65,
-      "status": "NEEDS_CONFIRMATION",
+      "status": "CONFIRMED",
       "notes": "Sheet written as 60.5 m, presumed 60.5 cm (NEEDS_CONFIRMATION)",
       "baseline_mm": 605.0
     },

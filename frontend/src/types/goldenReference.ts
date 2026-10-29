@@ -72,6 +72,128 @@ export interface CheckpointInspectionResult {
   roi_bbox: [number, number, number, number]
 }
 
+export interface TopologyFeatureLocation {
+  id?: string
+  terminal_id?: string
+  junction_id?: string
+  node_id?: string
+  checkpoint_id?: string
+  type?: string
+  x?: number
+  y?: number
+  location_x?: number
+  location_y?: number
+  golden_x?: number
+  golden_y?: number
+  status?: string
+  label?: string
+}
+
+export interface JunctionTerminalLength {
+  junction_id: string
+  terminal_id: string
+  expected_mm: number | null
+  detected_mm: number | null
+  expected_cm: number | null
+  detected_cm: number | null
+  tolerance_mm: number | null
+  deviation_mm: number | null
+  status: string
+}
+
+export interface JunctionJunctionLength {
+  from_junction: string
+  to_junction: string
+  expected_mm: number | null
+  detected_mm: number | null
+  expected_cm: number | null
+  detected_cm: number | null
+  tolerance_mm: number | null
+  deviation_mm: number | null
+  status: string
+}
+
+export interface NodeNodeLength {
+  from_node: string
+  to_node: string
+  expected_mm: number | null
+  detected_mm: number | null
+  expected_cm: number | null
+  detected_cm: number | null
+  tolerance_mm: number | null
+  deviation_mm: number | null
+  status: string
+}
+
+export interface TopologySummary {
+  terminal_count: number
+  junction_count: number
+  branch_count: number
+  node_count: number
+  terminals: TopologyFeatureLocation[]
+  junctions: TopologyFeatureLocation[]
+  nodes: TopologyFeatureLocation[]
+  junction_to_terminal_lengths: JunctionTerminalLength[]
+  junction_to_junction_lengths: JunctionJunctionLength[]
+  node_to_node_lengths: NodeNodeLength[]
+}
+
+export interface ColoredTapeInfo {
+  color_id: string
+  name: string
+  detected: boolean
+  status: string
+  confidence: number
+  percentage: number
+  color_hex: string
+  description: string
+}
+
+export interface ColoredTapeSummary {
+  green?: ColoredTapeInfo
+  dark_blue?: ColoredTapeInfo
+  grey?: ColoredTapeInfo
+  black?: ColoredTapeInfo
+  all_colors?: ColoredTapeInfo[]
+}
+
+export interface StickerSummary {
+  present: boolean
+  status: 'PRESENT' | 'NOT_PRESENT'
+  confidence: number
+  notification: string
+  fields: {
+    harness_code?: string | null
+    part_number?: string | null
+    description?: string | null
+    drawing_number?: string | null
+    serial_number?: string | null
+    barcode_payload?: string | null
+    supplier?: string | null
+    batch_code?: string | null
+  }
+  thumbnail_data_url?: string | null
+}
+
+export interface TerminalIdentification {
+  terminal_id: string
+  checkpoint_id: string
+  location_x: number
+  location_y: number
+  golden_x: number
+  golden_y: number
+  expected_mm: number | null
+  detected_mm: number | null
+  expected_cm?: number | null
+  detected_cm?: number | null
+  deviation_mm: number | null
+  tolerance_mm: number | null
+  status: string
+  parent_junction: string
+  confidence: number
+  label?: string
+}
+
 export interface GoldenInspectionResponse {
   inspection_id: string
   timestamp: string
@@ -86,4 +208,8 @@ export interface GoldenInspectionResponse {
   marked_image_data_url: string
   results: CheckpointInspectionResult[]
   summary_notes: string[]
+  topology_summary?: TopologySummary
+  colored_tapes?: ColoredTapeSummary
+  sticker?: StickerSummary
+  terminal_identifications?: TerminalIdentification[]
 }
