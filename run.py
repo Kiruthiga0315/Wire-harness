@@ -29,6 +29,16 @@ def resolve_backend_python() -> Path:
 
 def resolve_npm() -> str:
     npm = shutil.which("npm.cmd") if os.name == "nt" else shutil.which("npm")
+    if npm is None and os.name == "nt":
+        candidates = [
+            Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / "nodejs",
+            Path(os.environ.get("ProgramFiles", "C:\\Program Files")) / "nodejs",
+        ]
+        for dir_path in candidates:
+            cmd = dir_path / "npm.cmd"
+            if cmd.is_file():
+                os.environ["PATH"] = str(dir_path) + os.pathsep + os.environ.get("PATH", "")
+                return str(cmd)
     if npm is None:
         raise RuntimeError("npm was not found. Install Node.js 20 or newer and try again.")
     return npm

@@ -14,6 +14,7 @@ import type { ChangeEvent } from 'react'
 import { EngineeringCheckpointEditor } from '../components/EngineeringCheckpointEditor'
 import { ColorInspectionPanel } from '../components/ColorInspectionPanel'
 import { HarnessGraphPanel } from '../components/HarnessGraphPanel'
+import { WireColorIdentificationPanel } from '../components/WireColorIdentificationPanel'
 import { PageHeader } from '../components/PageHeader'
 import { StatusPill } from '../components/StatusPill'
 import { useInspection } from '../context/InspectionContext'
@@ -257,6 +258,8 @@ export function EngineeringViewPage() {
           )
         })}
       </section>
+
+      <WireColorIdentificationPanel />
 
       <HarnessGraphPanel />
 

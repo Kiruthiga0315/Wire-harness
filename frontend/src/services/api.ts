@@ -4,6 +4,7 @@ import type { CheckpointPayload, EngineeringCheckpoint } from '../types/checkpoi
 import type { MockInspectionResponse } from '../types/inspection'
 import type { ColorInspectionResponse } from '../types/colorInspection'
 import type { InspectionReportResponse, StickerInspectionReport } from '../types/report'
+import type { WireColorIdentificationResponse } from '../types/wireColor' 
 
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
 const DEMO_IMAGE_PATH = '/api/test-images/harness_sample_01.jpeg'
@@ -126,6 +127,23 @@ export async function runDemoSegmentation(signal?: AbortSignal): Promise<Segment
     if (error instanceof DOMException && error.name === 'AbortError') throw error
     if (error instanceof ApiError) throw error
     throw new ApiError('Engineering processing unavailable. Check that the backend is running.')
+  }
+}
+
+export async function runWireColorIdentification(signal?: AbortSignal): Promise<WireColorIdentificationResponse> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/engineering/wire-color-identification`, {
+      method: 'POST',
+      signal,
+    })
+    if (!response.ok) {
+      throw new ApiError('Wire colour identification analysis failed.', response.status)
+    }
+    return (await response.json()) as WireColorIdentificationResponse
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') throw error
+    if (error instanceof ApiError) throw error
+    throw new ApiError('Wire colour identification service unavailable. Check that the backend is running.')
   }
 }
 

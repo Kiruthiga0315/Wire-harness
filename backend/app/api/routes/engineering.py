@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.models import Checkpoint
 from app.schemas.checkpoint import CheckpointRead
+from app.schemas.wire_color import WireColorIdentificationResponse
 from app.schemas.color_inspection import (
     ColorInspectionRequest,
     ColorInspectionResponse,
@@ -49,6 +50,8 @@ router = APIRouter(prefix="/engineering", tags=["Engineering"])
 segmentation_service = HarnessSegmentationService()
 color_inspection_service = ColorInspectionService()
 harness_graph_service = HarnessGraphService()
+from app.services.wire_color_service import WireColorIdentificationService
+wire_color_service = WireColorIdentificationService(segmentation_service=segmentation_service)
 
 
 def _png_data_url(image: ImageArray) -> str:
@@ -475,3 +478,19 @@ def analyse_demo_harness_graph() -> HarnessGraphResponse:
         physical_verifications=physical_verifications,
         verification_summary=verification_summary,
     )
+
+@router.post(
+    "/wire-color-identification",
+    response_model=WireColorIdentificationResponse,
+    summary="Identify dark blue, black, and green wire sections on the active workpiece",
+)
+def identify_wire_colors() -> WireColorIdentificationResponse:
+    active = active_image_service.get_active_image()
+    try:
+        return wire_color_service.identify_colors(
+            active.bgr_image,
+            source_filename=active.filename,
+        )
+    except (ValueError, RuntimeError) as exc:
+        raise HTTPException(status_code=422, detail=f"Wire colour identification failed: {exc}") from exc
+
