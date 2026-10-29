@@ -1,5 +1,6 @@
 import {
   CheckCircle2,
+  Crosshair,
   Download,
   FileText,
   Info,
@@ -40,6 +41,7 @@ export function GoldenReferencePage() {
   // Selected checkpoint for editing
   const [selectedId, setSelectedId] = useState<string | null>('CP-T01')
   const [isCreatingNew, setIsCreatingNew] = useState(false)
+  const [isRepositioningExisting, setIsRepositioningExisting] = useState(false)
   const [filterCategory, setFilterCategory] = useState<'all' | 'terminal' | 'node_distance' | 'unconfirmed'>('all')
   const [searchTerm, setSearchTerm] = useState('')
 
@@ -110,25 +112,41 @@ export function GoldenReferencePage() {
 
   const handleSaveDraft = async () => {
     if (!draft || !config) return
-    if (!draft.checkpoint_id.trim()) {
+    const cid = draft.checkpoint_id.trim()
+    if (!cid) {
       setError('Please provide a Checkpoint ID.')
       return
     }
-    if (isDuplicateId) {
-      setError(`Checkpoint ID '${draft.checkpoint_id}' already exists. Choose a unique ID or update the existing checkpoint.`)
+
+    const existingCp = config.checkpoints.find(
+      (c) => c.checkpoint_id.toUpperCase() === cid.toUpperCase()
+    )
+
+    if (isCreatingNew && existingCp) {
+      setError(`Checkpoint ID '${cid}' already exists. Choose a unique ID or update the existing checkpoint.`)
       return
     }
+
     setSaving(true)
     setError(null)
     try {
-      if (isCreatingNew) {
-        const added = await addGoldenCheckpoint(draft)
+      if (isCreatingNew || !existingCp) {
+        // Save as a brand new checkpoint!
+        const payload: GoldenCheckpoint = {
+          ...draft,
+          checkpoint_id: cid,
+          status: draft.status || 'CONFIRMED',
+        }
+        const added = await addGoldenCheckpoint(payload)
         setConfig((prev) => (prev ? { ...prev, checkpoints: [...prev.checkpoints, added] } : null))
         setSelectedId(added.checkpoint_id)
+        setDraft({ ...added })
         setIsCreatingNew(false)
+        setIsRepositioningExisting(false)
         setSuccessMessage(`Created new checkpoint ${added.checkpoint_id}`)
       } else {
-        const updated = await updateGoldenCheckpoint(draft.checkpoint_id, draft)
+        // Update existing checkpoint
+        const updated = await updateGoldenCheckpoint(existingCp.checkpoint_id, draft)
         setConfig((prev) => {
           if (!prev) return null
           return {
@@ -136,7 +154,9 @@ export function GoldenReferencePage() {
             checkpoints: prev.checkpoints.map((c) => (c.checkpoint_id === updated.checkpoint_id ? updated : c)),
           }
         })
-        setSuccessMessage(`Saved checkpoint ${draft.checkpoint_id}`)
+        setDraft({ ...updated })
+        setIsRepositioningExisting(false)
+        setSuccessMessage(`Saved checkpoint ${updated.checkpoint_id}`)
       }
       setTimeout(() => setSuccessMessage(null), 3000)
     } catch (err) {
@@ -213,8 +233,9 @@ export function GoldenReferencePage() {
     if (!config) return
     setIsCreatingNew(true)
     setSelectedId(null)
-    const existingIds = new Set(config.checkpoints.map((c) => c.checkpoint_id))
-    let nextNum = config.checkpoints.length + 1
+    setIsRepositioningExisting(false)
+    const existingIds = new Set(config.checkpoints.map((c) => c.checkpoint_id.toUpperCase()))
+    let nextNum = 1
     while (existingIds.has(`CP-T${String(nextNum).padStart(2, '0')}`) || existingIds.has(`CP-T${nextNum}`)) {
       nextNum++
     }
@@ -272,6 +293,17 @@ export function GoldenReferencePage() {
       return
     }
 
+    // If explicitly moving the currently selected checkpoint
+    if (isRepositioningExisting && draft) {
+      setDraft({
+        ...draft,
+        reference_x: imgX,
+        reference_y: imgY,
+      })
+      setIsRepositioningExisting(false)
+      return
+    }
+
     // If currently creating a new checkpoint, move the marker to the clicked position
     if (isCreatingNew && draft) {
       setDraft({
@@ -282,17 +314,8 @@ export function GoldenReferencePage() {
       return
     }
 
-    // If an existing checkpoint is currently selected, clicking the canvas repositions it!
-    if (draft) {
-      setDraft({
-        ...draft,
-        reference_x: imgX,
-        reference_y: imgY,
-      })
-      return
-    }
-
-    // Otherwise, clicking on empty canvas initiates adding a new checkpoint
+    // Otherwise, clicking on the canvas starts adding a NEW checkpoint at that location!
+    // This leaves existing checkpoints (like T01) completely in place!
     handleStartAddNew(imgX, imgY)
   }
 
@@ -508,8 +531,8 @@ export function GoldenReferencePage() {
                     : isJoint
                       ? 'rgba(185, 28, 28, 0.92)'
                       : 'rgba(21, 128, 61, 0.92)'
-                  const posX = isSelected && draft ? draft.reference_x : cp.reference_x
-                  const posY = isSelected && draft ? draft.reference_y : cp.reference_y
+                  const posX = isSelected && isRepositioningExisting && draft ? draft.reference_x : cp.reference_x
+                  const posY = isSelected && isRepositioningExisting && draft ? draft.reference_y : cp.reference_y
                   const leftPct = (posX / (config?.image_width ?? 357)) * 100
                   const topPct = (posY / (config?.image_height ?? 767)) * 100
                   const label = cp.terminal_id || cp.node_id || cp.checkpoint_id
@@ -520,6 +543,7 @@ export function GoldenReferencePage() {
                       onClick={(e) => {
                         e.stopPropagation()
                         setIsCreatingNew(false)
+                        setIsRepositioningExisting(false)
                         setSelectedId(cp.checkpoint_id)
                         setDraft({ ...cp })
                       }}
@@ -772,12 +796,15 @@ export function GoldenReferencePage() {
                   <input
                     type="text"
                     value={draft.terminal_id || ''}
+                    placeholder="e.g. T43"
                     onChange={(e) => {
-                      const val = e.target.value || null
+                      const raw = e.target.value.trim()
+                      const val = raw || null
+                      const term = val ? (val.toUpperCase().startsWith('T') ? val.toUpperCase() : `T${val}`) : null
                       setDraft({
                         ...draft,
                         terminal_id: val,
-                        ...(isCreatingNew && val ? { checkpoint_id: `CP-${val}` } : {}),
+                        ...(term ? { checkpoint_id: `CP-${term}` } : {}),
                       })
                     }}
                   />
@@ -830,6 +857,21 @@ export function GoldenReferencePage() {
                     onChange={(e) => setDraft({ ...draft, reference_y: Number(e.target.value) })}
                   />
                 </label>
+                {!isCreatingNew && (
+                  <div style={{ gridColumn: 'span 2' }}>
+                    <button
+                      type="button"
+                      className={`button ${isRepositioningExisting ? 'button--primary' : 'button--secondary'}`}
+                      style={{ width: '100%', padding: '5px 10px', fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                      onClick={() => setIsRepositioningExisting(!isRepositioningExisting)}
+                    >
+                      <Crosshair size={13} />
+                      {isRepositioningExisting
+                        ? `📍 Click canvas to place ${draft.checkpoint_id}`
+                        : `Move Existing ${draft.checkpoint_id} Marker`}
+                    </button>
+                  </div>
+                )}
               </div>
 
               <label className="form-field">
