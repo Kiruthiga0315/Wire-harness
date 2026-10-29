@@ -387,6 +387,7 @@ def analyse_demo_harness_graph() -> HarnessGraphResponse:
                 node.node_type == "END_TERMINAL" for node in graph.nodes
             ),
             unresolved_segment_count=graph.unresolved_segment_count,
+            node_count=len(graph.nodes),
         ),
         endpoints=[GraphPointResponse(x=point.x, y=point.y) for point in graph.endpoints],
         junctions=[GraphPointResponse(x=point.x, y=point.y) for point in graph.junctions],
