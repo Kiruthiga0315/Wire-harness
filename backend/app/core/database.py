@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import Generator
 
 from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.core.settings import get_settings
+
+logger = logging.getLogger(__name__)
 
 
 class Base(DeclarativeBase):
@@ -56,9 +59,9 @@ def initialize_database() -> None:
     with SessionLocal() as session:
         seed_demo_data(session)
         try:
-            from app.services.checkpoint_service import checkpoint_service
-            checkpoint_service.sync_from_golden_reference(
-                session, "DEMO-HARNESS-001", replace=True, scale_to_active_image=True
+            from app.services.checkpoint_service import CheckpointService
+            CheckpointService(session).sync_from_golden_reference(
+                "DEMO-HARNESS-001", replace=True, scale_to_active_image=True
             )
         except Exception as exc:
             logger.warning("Auto-sync of golden checkpoints skipped during init: %s", exc)
