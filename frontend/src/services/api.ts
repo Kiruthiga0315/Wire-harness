@@ -352,7 +352,14 @@ export async function updateGoldenCheckpoint(
       body: JSON.stringify(payload),
     })
     if (!response.ok) {
-      throw new ApiError(`Failed to update checkpoint ${checkpointId}`, response.status)
+      let detail = `Failed to update checkpoint ${checkpointId}`
+      try {
+        const body = (await response.json()) as { detail?: string }
+        if (body.detail) detail = body.detail
+      } catch {
+        // fallback
+      }
+      throw new ApiError(detail, response.status)
     }
     return (await response.json()) as import('../types/goldenReference').GoldenCheckpoint
   } catch (error) {
@@ -371,7 +378,14 @@ export async function addGoldenCheckpoint(
       body: JSON.stringify(payload),
     })
     if (!response.ok) {
-      throw new ApiError('Failed to create checkpoint', response.status)
+      let detail = 'Failed to create checkpoint'
+      try {
+        const body = (await response.json()) as { detail?: string }
+        if (body.detail) detail = body.detail
+      } catch {
+        // fallback
+      }
+      throw new ApiError(detail, response.status)
     }
     return (await response.json()) as import('../types/goldenReference').GoldenCheckpoint
   } catch (error) {

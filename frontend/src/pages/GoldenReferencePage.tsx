@@ -102,8 +102,22 @@ export function GoldenReferencePage() {
     })
   }, [config, filterCategory, searchTerm])
 
+  const isDuplicateId = useMemo(() => {
+    if (!isCreatingNew || !config || !draft?.checkpoint_id) return false
+    const trimmed = draft.checkpoint_id.trim().toUpperCase()
+    return config.checkpoints.some((c) => c.checkpoint_id.toUpperCase() === trimmed)
+  }, [isCreatingNew, config, draft?.checkpoint_id])
+
   const handleSaveDraft = async () => {
     if (!draft || !config) return
+    if (!draft.checkpoint_id.trim()) {
+      setError('Please provide a Checkpoint ID.')
+      return
+    }
+    if (isDuplicateId) {
+      setError(`Checkpoint ID '${draft.checkpoint_id}' already exists. Choose a unique ID or update the existing checkpoint.`)
+      return
+    }
     setSaving(true)
     setError(null)
     try {
@@ -268,7 +282,17 @@ export function GoldenReferencePage() {
       return
     }
 
-    // Otherwise, clicking on the image initiates adding a new checkpoint right at that location
+    // If an existing checkpoint is currently selected, clicking the canvas repositions it!
+    if (draft) {
+      setDraft({
+        ...draft,
+        reference_x: imgX,
+        reference_y: imgY,
+      })
+      return
+    }
+
+    // Otherwise, clicking on empty canvas initiates adding a new checkpoint
     handleStartAddNew(imgX, imgY)
   }
 
@@ -484,8 +508,10 @@ export function GoldenReferencePage() {
                     : isJoint
                       ? 'rgba(185, 28, 28, 0.92)'
                       : 'rgba(21, 128, 61, 0.92)'
-                  const leftPct = (cp.reference_x / (config?.image_width ?? 357)) * 100
-                  const topPct = (cp.reference_y / (config?.image_height ?? 767)) * 100
+                  const posX = isSelected && draft ? draft.reference_x : cp.reference_x
+                  const posY = isSelected && draft ? draft.reference_y : cp.reference_y
+                  const leftPct = (posX / (config?.image_width ?? 357)) * 100
+                  const topPct = (posY / (config?.image_height ?? 767)) * 100
                   const label = cp.terminal_id || cp.node_id || cp.checkpoint_id
 
                   return (
@@ -633,7 +659,7 @@ export function GoldenReferencePage() {
 
           <footer className="checkpoint-canvas-footer" style={{ padding: '10px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: 11, color: 'var(--slate-500)' }}>
-              Click any marker to inspect & edit expected values. Click empty area to add new checkpoint.
+              Click any marker to inspect. Click canvas to reposition the selected marker, or click &quot;+ Add Checkpoint&quot; to place a new one.
             </span>
             <strong style={{ fontSize: 11, color: 'var(--slate-700)' }}>
               {config?.image_width} × {config?.image_height} px
@@ -685,6 +711,7 @@ export function GoldenReferencePage() {
                     type="text"
                     value={draft.checkpoint_id}
                     onChange={(e) => setDraft({ ...draft, checkpoint_id: e.target.value })}
+                    style={isDuplicateId ? { borderColor: '#ef4444', background: '#fef2f2' } : {}}
                   />
                 </label>
                 <label className="form-field">
@@ -699,6 +726,45 @@ export function GoldenReferencePage() {
                   </select>
                 </label>
               </div>
+
+              {isDuplicateId && (
+                <div style={{ padding: '8px 12px', background: '#fee2e2', border: '1px solid #fca5a5', borderRadius: 4, color: '#991b1b', fontSize: 11 }}>
+                  <strong>⚠️ ID &quot;{draft.checkpoint_id}&quot; already exists!</strong>
+                  <div style={{ marginTop: 6, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      className="button button--secondary"
+                      style={{ padding: '3px 8px', fontSize: 10, background: '#ffffff' }}
+                      onClick={() => {
+                        const existing = config?.checkpoints.find((c) => c.checkpoint_id.toUpperCase() === draft.checkpoint_id.trim().toUpperCase())
+                        if (existing) {
+                          setIsCreatingNew(false)
+                          setSelectedId(existing.checkpoint_id)
+                          setDraft({ ...existing, reference_x: draft.reference_x, reference_y: draft.reference_y })
+                        }
+                      }}
+                    >
+                      Update Existing {draft.checkpoint_id} Coordinates
+                    </button>
+                    <button
+                      type="button"
+                      className="button button--secondary"
+                      style={{ padding: '3px 8px', fontSize: 10, background: '#ffffff' }}
+                      onClick={() => {
+                        const existingIds = new Set(config?.checkpoints.map((c) => c.checkpoint_id.toUpperCase()))
+                        let nextNum = (config?.checkpoints.length ?? 0) + 1
+                        while (existingIds.has(`CP-T${String(nextNum).padStart(2, '0')}`) || existingIds.has(`CP-T${nextNum}`)) {
+                          nextNum++
+                        }
+                        const termId = `T${String(nextNum).padStart(2, '0')}`
+                        setDraft({ ...draft, checkpoint_id: `CP-${termId}`, terminal_id: termId })
+                      }}
+                    >
+                      Auto-Assign Unique ID
+                    </button>
+                  </div>
+                </div>
+              )}
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 <label className="form-field">
@@ -797,7 +863,12 @@ export function GoldenReferencePage() {
               <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
                 {isCreatingNew ? (
                   <>
-                    <button className="button button--primary" onClick={handleSaveDraft} disabled={saving} style={{ flex: 1 }}>
+                    <button
+                      className="button button--primary"
+                      onClick={handleSaveDraft}
+                      disabled={saving || isDuplicateId}
+                      style={{ flex: 1, opacity: isDuplicateId ? 0.6 : 1, cursor: isDuplicateId ? 'not-allowed' : 'pointer' }}
+                    >
                       + Add Checkpoint
                     </button>
                     <button className="button button--secondary" onClick={handleCancelNew} style={{ flex: 1 }}>
