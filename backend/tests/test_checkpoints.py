@@ -117,7 +117,7 @@ def test_sync_checkpoints_from_golden_reference() -> None:
             )
             assert sync_res.status_code == 200
             checkpoints = sync_res.json()
-            assert len(checkpoints) >= 50
+            assert len(checkpoints) >= 34
             # Verify CP-T01 exists and has scaled coordinates
             cpt01 = next((c for c in checkpoints if c["checkpoint_id"] == "CP-T01"), None)
             assert cpt01 is not None

@@ -1,0 +1,52 @@
+{
+  "source": "1793411476400_WhatsApp_Image_2026-10-31_at_7_17_21_AM.jpeg",
+  "raw": {
+    "size": [
+      1600,
+      1069
+    ],
+    "sharpness_laplacian_var": 454.9,
+    "brightness_mean": 147.0,
+    "contrast_std": 68.2,
+    "clipped_dark_%": 0.0,
+    "clipped_bright_%": 9.73,
+    "verdict": "PASS"
+  },
+  "board_crop": {
+    "size": [
+      1800,
+      560
+    ],
+    "sharpness_laplacian_var": 134.3,
+    "brightness_mean": 207.3,
+    "contrast_std": 52.0,
+    "clipped_dark_%": 0.0,
+    "clipped_bright_%": 27.59,
+    "verdict": "PASS"
+  },
+  "enhanced": {
+    "size": [
+      1800,
+      560
+    ],
+    "sharpness_laplacian_var": 206.1,
+    "brightness_mean": 152.0,
+    "contrast_std": 51.1,
+    "clipped_dark_%": 0.0,
+    "clipped_bright_%": 0.05,
+    "verdict": "PASS"
+  },
+  "harness_isolated": {
+    "size": [
+      1800,
+      560
+    ],
+    "sharpness_laplacian_var": 1000.4,
+    "brightness_mean": 235.2,
+    "contrast_std": 50.2,
+    "clipped_dark_%": 0.0,
+    "clipped_bright_%": 85.06,
+    "harness_coverage_%": 15.07,
+    "verdict": "n/a (isolated composite)"
+  }
+}

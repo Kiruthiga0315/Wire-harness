@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+import numpy as np
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -78,22 +80,50 @@ class CheckpointService:
         if not golden_checkpoints:
             return self.list_for_model(model_id)
 
-        golden_w = float(config.get("image_width", 357) or 357)
-        golden_h = float(config.get("image_height", 767) or 767)
+        golden_w = float(config.get("image_width", 1800) or 1800)
+        golden_h = float(config.get("image_height", 560) or 560)
 
         target_w = golden_w
         target_h = golden_h
         if scale_to_active_image:
             active = active_image_service.get_active_image()
             if active is not None and active.width > 0 and active.height > 0:
-                target_w = float(active.width)
-                target_h = float(active.height)
+                active_aspect = active.width / active.height
+                golden_aspect = golden_w / golden_h
+                # Only scale if aspect ratios match; never crush landscape coordinates into portrait
+                if abs(active_aspect - golden_aspect) < 0.5:
+                    target_w = float(active.width)
+                    target_h = float(active.height)
+                else:
+                    target_w = golden_w
+                    target_h = golden_h
             else:
-                target_w = 681.0
-                target_h = 1584.0
+                target_w = golden_w
+                target_h = golden_h
 
         scale_x = target_w / golden_w
         scale_y = target_h / golden_h
+        scale_roi = math.sqrt(scale_x * scale_y) if (scale_x > 0 and scale_y > 0) else 1.0
+
+        is_same_scale = abs(scale_x - 1.0) < 0.02 and abs(scale_y - 1.0) < 0.02
+
+        # Feature snapping to physically detected skeleton endpoints and junctions
+        # Only snap when translating between different image resolutions (e.g. demo 681x1584 to 1800x560).
+        # When dimensions match, preserve the user's exact manual coordinates without modification.
+        snapping_keypoints: list[tuple[int, int]] = []
+        if scale_to_active_image and not is_same_scale:
+            try:
+                active = active_image_service.get_active_image()
+                if active is not None and active.bgr_image is not None:
+                    from app.services.feature_extraction_service import FeatureExtractionService
+                    fe = FeatureExtractionService().extract_features(active.bgr_image)
+                    snapping_keypoints = [
+                        (ep.x, ep.y) for ep in fe.skeleton_features.endpoint_candidates
+                    ] + [
+                        (j.x, j.y) for j in fe.skeleton_features.junction_candidates
+                    ]
+            except Exception:
+                snapping_keypoints = []
 
         existing_map = {
             cp.checkpoint_id: cp
@@ -162,11 +192,20 @@ class CheckpointService:
             tol_val = gcp.get("tolerance")
             tolerance = round(tol_val / 10.0, 1) if tol_val is not None else 1.5
 
-            # Scaled coordinates
-            ref_x = int(round(gcp.get("reference_x", 0) * scale_x))
-            ref_y = int(round(gcp.get("reference_y", 0) * scale_y))
-            roi_w = max(20, int(round(gcp.get("roi_width", 45) * scale_x)))
-            roi_h = max(20, int(round(gcp.get("roi_height", 45) * scale_y)))
+            # Scaled coordinates clamped within valid image boundaries
+            ref_x = max(0, min(int(target_w), int(round(gcp.get("reference_x", 0) * scale_x))))
+            ref_y = max(0, min(int(target_h), int(round(gcp.get("reference_y", 0) * scale_y))))
+
+            # Snap to closest detected feature within 65px radius if available
+            if snapping_keypoints:
+                closest = min(snapping_keypoints, key=lambda p: math.hypot(p[0] - ref_x, p[1] - ref_y))
+                if math.hypot(closest[0] - ref_x, closest[1] - ref_y) <= 65.0:
+                    ref_x = max(0, min(int(target_w), int(closest[0])))
+                    ref_y = max(0, min(int(target_h), int(closest[1])))
+
+            # Isotropic proportional ROI size to prevent stretched rectangles
+            roi_w = max(35, min(80, int(round(gcp.get("roi_width", 45) * scale_roi))))
+            roi_h = max(35, min(80, int(round(gcp.get("roi_height", 45) * scale_roi))))
 
             existing = existing_map.get(cid)
             if existing is not None:
@@ -200,12 +239,19 @@ class CheckpointService:
         # Retain or provide CP-008 for colour inspection compatibility
         if "CP-008" not in synced_ids:
             synced_ids.add("CP-008")
+            cp008_x = 438 if (target_w == 1800 and target_h == 560) else int(round(365 * (target_w / 681.0)))
+            cp008_y = 276 if (target_w == 1800 and target_h == 560) else int(round(440 * (target_h / 1584.0)))
             existing_cp008 = existing_map.get("CP-008")
             if existing_cp008 is not None:
-                existing_cp008.reference_x = 365
-                existing_cp008.reference_y = 440
-                existing_cp008.roi_width = 100
-                existing_cp008.roi_height = 100
+                existing_cp008.checkpoint_name = "Tape T1 Colour Inspection"
+                existing_cp008.category = "Tape"
+                existing_cp008.inspection_type = "Colour"
+                existing_cp008.expected_value = "Blue"
+                existing_cp008.reference_x = cp008_x
+                existing_cp008.reference_y = cp008_y
+                existing_cp008.roi_width = 80
+                existing_cp008.roi_height = 80
+                existing_cp008.enabled = True
             else:
                 cp008 = Checkpoint(
                     checkpoint_id="CP-008",
@@ -215,10 +261,10 @@ class CheckpointService:
                     inspection_type="Colour",
                     expected_value="Blue",
                     tolerance=None,
-                    reference_x=365,
-                    reference_y=440,
-                    roi_width=100,
-                    roi_height=100,
+                    reference_x=cp008_x,
+                    reference_y=cp008_y,
+                    roi_width=80,
+                    roi_height=80,
                     enabled=True,
                 )
                 self.session.add(cp008)

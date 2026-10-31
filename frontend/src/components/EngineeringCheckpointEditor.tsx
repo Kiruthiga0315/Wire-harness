@@ -60,19 +60,31 @@ export function EngineeringCheckpointEditor({
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterCategory, setFilterCategory] = useState<string>('all')
+  const [naturalDimensions, setNaturalDimensions] = useState<{ width: number; height: number } | null>(null)
+
+  const effectiveW = naturalDimensions?.width || (imageWidth > 0 ? imageWidth : 1800)
+  const effectiveH = naturalDimensions?.height || (imageHeight > 0 ? imageHeight : 560)
 
   const fetchCheckpoints = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const records = await getCheckpoints(MODEL_ID)
+      let records = await getCheckpoints(MODEL_ID)
+      if (records.length === 0) {
+        try {
+          records = await syncCheckpointsFromGolden(MODEL_ID, true, true)
+        } catch {
+          // ignore
+        }
+      }
       setCheckpoints(records)
+      onCheckpointsChanged?.(records)
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Unable to load checkpoints.')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [onCheckpointsChanged])
 
   useEffect(() => {
     void fetchCheckpoints()
@@ -102,8 +114,8 @@ export function EngineeringCheckpointEditor({
 
   const handleImageClick = (event: MouseEvent<HTMLDivElement>) => {
     const bounds = event.currentTarget.getBoundingClientRect()
-    const x = Math.max(0, Math.min(imageWidth, Math.round(((event.clientX - bounds.left) * imageWidth) / bounds.width)))
-    const y = Math.max(0, Math.min(imageHeight, Math.round(((event.clientY - bounds.top) * imageHeight) / bounds.height)))
+    const x = Math.max(0, Math.min(effectiveW, Math.round(((event.clientX - bounds.left) * effectiveW) / bounds.width)))
+    const y = Math.max(0, Math.min(effectiveH, Math.round(((event.clientY - bounds.top) * effectiveH) / bounds.height)))
     setEditingId(null)
     setDraft(newDraft(x, y, checkpoints.length + 1))
     setError(null)
@@ -235,28 +247,41 @@ export function EngineeringCheckpointEditor({
         <div className="checkpoint-canvas-stage">
           <div
             className="checkpoint-image-layer"
-            style={{ aspectRatio: `${imageWidth} / ${imageHeight}` }}
+            style={{ aspectRatio: `${effectiveW} / ${effectiveH}` }}
             onClick={handleImageClick}
             role="application"
             aria-label="Click the harness image to add an engineering checkpoint"
           >
-            <img src={imageUrl || ACTIVE_IMAGE_URL} alt="Harness sample for checkpoint placement" draggable={false} />
+            <img
+              src={imageUrl || ACTIVE_IMAGE_URL}
+              alt="Harness sample for checkpoint placement"
+              draggable={false}
+              onLoad={(e) => {
+                if (e.currentTarget.naturalWidth && e.currentTarget.naturalHeight) {
+                  setNaturalDimensions({
+                    width: e.currentTarget.naturalWidth,
+                    height: e.currentTarget.naturalHeight,
+                  })
+                }
+              }}
+              style={{ width: '100%', height: '100%', display: 'block', objectFit: 'fill', pointerEvents: 'none' }}
+            />
             {displayCheckpoints.map((checkpoint) => (
               <Fragment key={checkpoint.checkpoint_id}>
                 <span
                   className={`checkpoint-roi ${editingId === checkpoint.checkpoint_id ? 'checkpoint-roi--selected' : ''}`}
                   style={{
-                    left: `${((checkpoint.reference_x - checkpoint.roi_width / 2) * 100) / imageWidth}%`,
-                    top: `${((checkpoint.reference_y - checkpoint.roi_height / 2) * 100) / imageHeight}%`,
-                    width: `${(checkpoint.roi_width * 100) / imageWidth}%`,
-                    height: `${(checkpoint.roi_height * 100) / imageHeight}%`,
+                    left: `${((checkpoint.reference_x - checkpoint.roi_width / 2) * 100) / effectiveW}%`,
+                    top: `${((checkpoint.reference_y - checkpoint.roi_height / 2) * 100) / effectiveH}%`,
+                    width: `${(checkpoint.roi_width * 100) / effectiveW}%`,
+                    height: `${(checkpoint.roi_height * 100) / effectiveH}%`,
                   }}
                 />
                 <button
                   className={`configured-checkpoint ${editingId === checkpoint.checkpoint_id ? 'configured-checkpoint--selected' : ''}`}
                   style={{
-                    left: `${(checkpoint.reference_x * 100) / imageWidth}%`,
-                    top: `${(checkpoint.reference_y * 100) / imageHeight}%`,
+                    left: `${(checkpoint.reference_x * 100) / effectiveW}%`,
+                    top: `${(checkpoint.reference_y * 100) / effectiveH}%`,
                   }}
                   onClick={(event) => {
                     event.stopPropagation()
@@ -276,17 +301,17 @@ export function EngineeringCheckpointEditor({
                 <span
                   className="checkpoint-roi checkpoint-roi--draft"
                   style={{
-                    left: `${((draft.reference_x - draft.roi_width / 2) * 100) / imageWidth}%`,
-                    top: `${((draft.reference_y - draft.roi_height / 2) * 100) / imageHeight}%`,
-                    width: `${(draft.roi_width * 100) / imageWidth}%`,
-                    height: `${(draft.roi_height * 100) / imageHeight}%`,
+                    left: `${((draft.reference_x - draft.roi_width / 2) * 100) / effectiveW}%`,
+                    top: `${((draft.reference_y - draft.roi_height / 2) * 100) / effectiveH}%`,
+                    width: `${(draft.roi_width * 100) / effectiveW}%`,
+                    height: `${(draft.roi_height * 100) / effectiveH}%`,
                   }}
                 />
                 <span
                   className="draft-checkpoint"
                   style={{
-                    left: `${(draft.reference_x * 100) / imageWidth}%`,
-                    top: `${(draft.reference_y * 100) / imageHeight}%`,
+                    left: `${(draft.reference_x * 100) / effectiveW}%`,
+                    top: `${(draft.reference_y * 100) / effectiveH}%`,
                   }}
                 >
                   <i />
@@ -302,7 +327,7 @@ export function EngineeringCheckpointEditor({
             Click anywhere on the image to create a checkpoint.
           </span>
           <strong>
-            {imageWidth} × {imageHeight} px
+            {effectiveW} × {effectiveH} px
           </strong>
         </footer>
       </article>
@@ -440,7 +465,7 @@ export function EngineeringCheckpointEditor({
               <input
                 type="number"
                 min="0"
-                max={imageWidth}
+                max={effectiveW}
                 value={draft.reference_x}
                 onChange={(event) => updateDraft('reference_x', Number(event.target.value))}
               />
@@ -450,7 +475,7 @@ export function EngineeringCheckpointEditor({
               <input
                 type="number"
                 min="0"
-                max={imageHeight}
+                max={effectiveH}
                 value={draft.reference_y}
                 onChange={(event) => updateDraft('reference_y', Number(event.target.value))}
               />
@@ -460,7 +485,7 @@ export function EngineeringCheckpointEditor({
               <input
                 type="number"
                 min="1"
-                max={imageWidth}
+                max={effectiveW}
                 value={draft.roi_width}
                 onChange={(event) => updateDraft('roi_width', Number(event.target.value))}
               />
@@ -470,7 +495,7 @@ export function EngineeringCheckpointEditor({
               <input
                 type="number"
                 min="1"
-                max={imageHeight}
+                max={effectiveH}
                 value={draft.roi_height}
                 onChange={(event) => updateDraft('roi_height', Number(event.target.value))}
               />

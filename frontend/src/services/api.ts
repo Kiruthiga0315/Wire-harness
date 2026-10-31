@@ -4,7 +4,8 @@ import type { CheckpointPayload, EngineeringCheckpoint } from '../types/checkpoi
 import type { MockInspectionResponse } from '../types/inspection'
 import type { ColorInspectionResponse } from '../types/colorInspection'
 import type { InspectionReportResponse, StickerInspectionReport } from '../types/report'
-import type { WireColorIdentificationResponse } from '../types/wireColor' 
+import type { WireColorIdentificationResponse } from '../types/wireColor'
+import type { FeatureExtractionResponse } from '../types/featureExtraction' 
 
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
 const DEMO_IMAGE_PATH = '/api/test-images/harness_sample_01.jpeg'
@@ -266,12 +267,18 @@ export async function runColorInspection(
   modelId: string,
   checkpointId: string,
   debug: boolean,
+  expectedColour?: string,
 ): Promise<ColorInspectionResponse> {
   try {
     const response = await fetch(`${API_BASE_URL}/api/engineering/color-inspection`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model_id: modelId, checkpoint_id: checkpointId, debug }),
+      body: JSON.stringify({
+        model_id: modelId,
+        checkpoint_id: checkpointId,
+        debug,
+        expected_colour: expectedColour,
+      }),
     })
     if (!response.ok) {
       let message = 'Colour inspection failed.'
@@ -442,6 +449,43 @@ export async function resetGoldenReference(): Promise<import('../types/goldenRef
   }
 }
 
+export async function syncGoldenWithActiveImage(): Promise<import('../types/goldenReference').GoldenReferenceConfig> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/golden-reference/sync-active-image`, {
+      method: 'POST',
+    })
+    if (!response.ok) {
+      let detail = 'Failed to sync golden reference with active image'
+      try {
+        const err = (await response.json()) as { detail?: string }
+        if (err.detail) detail = err.detail
+      } catch {
+        // Fallback
+      }
+      throw new ApiError(detail, response.status)
+    }
+    return (await response.json()) as import('../types/goldenReference').GoldenReferenceConfig
+  } catch (error) {
+    if (error instanceof ApiError) throw error
+    throw new ApiError('Failed to sync golden reference with active image.')
+  }
+}
+
+export async function clearGoldenCheckpoints(): Promise<import('../types/goldenReference').GoldenReferenceConfig> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/golden-reference/clear-checkpoints`, {
+      method: 'POST',
+    })
+    if (!response.ok) {
+      throw new ApiError('Failed to clear golden checkpoints', response.status)
+    }
+    return (await response.json()) as import('../types/goldenReference').GoldenReferenceConfig
+  } catch (error) {
+    if (error instanceof ApiError) throw error
+    throw new ApiError('Failed to clear golden checkpoints.')
+  }
+}
+
 export async function runGoldenInspection(pixelsPerMm?: number): Promise<import('../types/goldenReference').GoldenInspectionResponse> {
   try {
     const response = await fetch(`${API_BASE_URL}/api/golden-reference/inspect`, {
@@ -534,5 +578,22 @@ export async function downloadGoldenReportPdf(): Promise<void> {
   } catch (error) {
     if (error instanceof ApiError) throw error
     throw new ApiError('Unable to download PDF inspection certificate.')
+  }
+}
+
+export async function runFeatureExtraction(config?: Record<string, unknown>): Promise<FeatureExtractionResponse> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/engineering/feature-extraction`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(config ?? {}),
+    })
+    if (!response.ok) {
+      throw new ApiError('Feature extraction failed.', response.status)
+    }
+    return (await response.json()) as FeatureExtractionResponse
+  } catch (error) {
+    if (error instanceof ApiError) throw error
+    throw new ApiError('Failed to execute feature extraction pipeline.')
   }
 }

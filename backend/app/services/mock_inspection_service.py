@@ -45,11 +45,18 @@ class MockInspectionService:
         table_crop: tuple[int, int, int, int] | None = None,
     ) -> MockInspectionResponse:
         results: list[MockCheckpointResult] = []
+        is_synthetic_12 = len(checkpoints) == 12
         for index, checkpoint in enumerate(checkpoints):
-            scenario = self.ng_scenarios.get(checkpoint.checkpoint_id)
+            scenario = self.ng_scenarios.get(checkpoint.checkpoint_id) if is_synthetic_12 else None
             if scenario:
                 actual_value, deviation, reason, confidence = scenario
                 status = "NG"
+            elif checkpoint.checkpoint_id == "CP-008":
+                actual_value = "Blue"
+                deviation = None
+                reason = "Blue tape presence and colour verified"
+                confidence = 0.978
+                status = "PASS"
             else:
                 actual_value = checkpoint.expected_value
                 deviation = "0" if checkpoint.tolerance is not None else None

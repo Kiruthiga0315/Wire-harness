@@ -2,6 +2,7 @@ export interface SegmentationImages {
   binary_mask: string
   contour_image: string
   skeleton_image: string
+  isolated_harness?: string
 }
 
 export interface SegmentationMetrics {

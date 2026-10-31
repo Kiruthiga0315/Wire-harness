@@ -97,6 +97,12 @@ def delete_checkpoint(checkpoint_id: str) -> dict[str, str]:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
+@router.delete("/checkpoints", summary="Clear all golden checkpoints")
+@router.post("/clear-checkpoints", summary="Clear all golden checkpoints")
+def clear_all_checkpoints() -> dict[str, Any]:
+    return golden_reference_service.clear_all_checkpoints()
+
+
 @router.post("/calibration", summary="Update measurement calibration")
 def update_calibration(payload: CalibrationUpdateRequest) -> dict[str, Any]:
     data = payload.model_dump()
@@ -106,6 +112,14 @@ def update_calibration(payload: CalibrationUpdateRequest) -> dict[str, Any]:
         data["pixels_per_mm"] = round(data["pixel_distance"] / data["known_distance_mm"], 4)
     data["calibrated"] = True
     return golden_reference_service.update_calibration(data)
+
+
+@router.post("/sync-active-image", summary="Synchronize golden reference configuration and image with active test image")
+def sync_golden_with_active_image() -> dict[str, Any]:
+    try:
+        return golden_reference_service.sync_with_active_image()
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=f"Failed to sync with active workpiece: {exc}") from exc
 
 
 @router.post("/reset", summary="Reset golden reference to default baseline")
@@ -161,7 +175,11 @@ def get_golden_image(image_name: str) -> FileResponse:
     if path is None or not path.exists():
         raise HTTPException(status_code=404, detail=f"Image asset '{image_name}' not found")
     media_type = "image/png" if path.suffix == ".png" else "image/jpeg"
-    return FileResponse(path, media_type=media_type)
+    return FileResponse(
+        path,
+        media_type=media_type,
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+    )
 
 
 @router.post("/inspect", summary="Inspect active workpiece or uploaded image against Golden Reference")

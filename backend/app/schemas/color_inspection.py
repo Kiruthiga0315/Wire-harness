@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 class ColorInspectionRequest(BaseModel):
     model_id: str = Field(default="DEMO-HARNESS-001", min_length=1, max_length=80)
     checkpoint_id: str = Field(min_length=1, max_length=80)
+    expected_colour: str | None = None
     debug: bool = False
 
 

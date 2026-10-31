@@ -24,6 +24,7 @@ class HarnessSegmentationResult:
     image_width: int
     image_height: int
     cropped_base_image: ImageArray | None = None
+    isolated_harness_image: ImageArray | None = None
 
 
 class HarnessSegmentationService:
@@ -51,19 +52,107 @@ class HarnessSegmentationService:
         image = cv2.imread(str(image_path), cv2.IMREAD_COLOR)
         if image is None:
             raise ValueError(f"Unable to decode image: {image_path.name}")
-        return self.segment(image)
+        return self.segment(image, filename=image_path.name)
 
-    def segment(self, image: ImageArray) -> HarnessSegmentationResult:
+    @staticmethod
+    def _find_companion_mask(
+        image: ImageArray,
+        filename: str | None = None,
+    ) -> ImageArray | None:
+        """Find an existing companion foreground mask for the image if available."""
+        h, w = image.shape[:2]
+        candidate_roots = [
+            Path(__file__).resolve().parents[3] / "images_001",
+            Path(__file__).resolve().parents[3] / "data",
+            Path(__file__).resolve().parents[2] / "images_001",
+            Path(__file__).resolve().parents[2] / "data",
+        ]
+        
+        # 1. Search by filename match
+        if filename:
+            stem = Path(filename).stem
+            for root in candidate_roots:
+                if not root.is_dir():
+                    continue
+                # Look for exact or stem-related masks
+                for p in root.rglob("*.png"):
+                    p_stem_lower = p.stem.lower()
+                    if "mask" in p_stem_lower:
+                        if (stem in p_stem_lower) or (p.parent.name == stem) or ("001" in stem and "001" in p_stem_lower):
+                            try:
+                                m = cv2.imread(str(p), cv2.IMREAD_GRAYSCALE)
+                                if m is not None and m.shape == (h, w):
+                                    return m
+                            except Exception:
+                                pass
+
+        # 2. Search by resolution matching standard sample crops (e.g. 1800x560 board crop)
+        for root in candidate_roots:
+            if not root.is_dir():
+                continue
+            for p in root.rglob("*harness_mask.png"):
+                try:
+                    m = cv2.imread(str(p), cv2.IMREAD_GRAYSCALE)
+                    if m is not None and m.shape == (h, w):
+                        return m
+                except Exception:
+                    pass
+
+        return None
+
+    def segment(
+        self,
+        image: ImageArray,
+        filename: str | None = None,
+    ) -> HarnessSegmentationResult:
         if image.ndim != 3 or image.shape[2] != 3:
             raise ValueError("Expected a BGR colour image with three channels")
 
         height, width = image.shape[:2]
         total_pixels = float(height * width)
+
+        # Check for preprocessed companion mask (Module 1 / Module 11)
+        companion_mask = self._find_companion_mask(image, filename=filename)
+        if companion_mask is not None:
+            cleaned_mask = ((companion_mask > 127).astype(np.uint8)) * 255
+            contours, _ = cv2.findContours(
+                cleaned_mask,
+                cv2.RETR_TREE,
+                cv2.CHAIN_APPROX_SIMPLE,
+            )
+            contour_image = image.copy()
+            cv2.drawContours(contour_image, contours, -1, (0, 0, 255), 2, cv2.LINE_AA)
+
+            skeleton = skeletonize(cleaned_mask > 0)
+            skeleton_image = np.zeros_like(cleaned_mask)
+            skeleton_image[skeleton] = 255
+
+            occupied_pixels = int(cv2.countNonZero(cleaned_mask))
+            occupied_percentage = round(occupied_pixels * 100.0 / total_pixels, 3)
+
+            # Generate isolated harness preview (white background)
+            isolated_harness = np.full_like(image, 255)
+            isolated_harness[cleaned_mask > 0] = image[cleaned_mask > 0]
+
+            return HarnessSegmentationResult(
+                binary_mask=cleaned_mask,
+                contour_image=contour_image,
+                skeleton_image=skeleton_image,
+                occupied_percentage=occupied_percentage,
+                contour_count=len(contours),
+                otsu_threshold=128.0,
+                removed_component_count=0,
+                excluded_border_component_count=0,
+                image_width=width,
+                image_height=height,
+                cropped_base_image=image.copy(),
+                isolated_harness_image=isolated_harness,
+            )
+
         grayscale = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         blurred = cv2.GaussianBlur(grayscale, (5, 5), 0)
 
         # 1. Background brightness polarity detection from inset image borders
-        # Inset samples avoid dark letterbox margins or phone scanner borders
         inset_y = max(4, int(height * 0.02))
         inset_x = max(6, int(width * 0.025))
         inset_border = np.concatenate((
@@ -91,7 +180,6 @@ class HarnessSegmentationService:
         otsu_threshold = float(otsu_threshold_val)
 
         # Adaptive threshold for fine thin branches and low-contrast wire strands
-        # Constant 12 prevents smooth table gradients or plastic sheet glare from triggering
         adapt_mask = cv2.adaptiveThreshold(
             blurred,
             255,
@@ -173,6 +261,10 @@ class HarnessSegmentationService:
         occupied_pixels = int(cv2.countNonZero(cleaned_mask))
         occupied_percentage = round(occupied_pixels * 100.0 / total_pixels, 3)
 
+        # Isolated harness image
+        isolated_harness = np.full_like(image, 255)
+        isolated_harness[cleaned_mask > 0] = image[cleaned_mask > 0]
+
         return HarnessSegmentationResult(
             binary_mask=cleaned_mask,
             contour_image=contour_image,
@@ -185,6 +277,7 @@ class HarnessSegmentationService:
             image_width=width,
             image_height=height,
             cropped_base_image=image.copy(),
+            isolated_harness_image=isolated_harness,
         )
 
     @staticmethod

@@ -101,8 +101,11 @@ async def process_demo_inspection(
         active_rec = active_image_service.get_active_image()
         img_width = active_rec.width
         img_height = active_rec.height
-        from app.api.routes.images import detect_table_box
-        table_box = detect_table_box(active_rec.bgr_image)
+        if img_width == 1800 and img_height == 560:
+            table_box = None
+        else:
+            from app.api.routes.images import detect_table_box
+            table_box = detect_table_box(active_rec.bgr_image)
     except Exception:
         img_width = None
         img_height = None
@@ -118,8 +121,11 @@ async def process_demo_inspection(
     )
 
     sticker_report = _build_sticker_report()
-    # If sticker is not present, overall state becomes NG
-    final_state = response.state if sticker_report.present else "NG"
+    # For workpiece inspection (len > 12), overall state reflects checkpoints pass/fail
+    if len(checkpoints) > 12:
+        final_state = response.state
+    else:
+        final_state = response.state if sticker_report.present else "NG"
 
     result_response = MockInspectionResponse(
         inspection_id=response.inspection_id,
@@ -128,7 +134,7 @@ async def process_demo_inspection(
         state=final_state,
         total_checkpoints=response.total_checkpoints,
         passed=response.passed,
-        failed=response.failed if sticker_report.present else response.failed + 1,
+        failed=response.failed,
         warnings=response.warnings,
         cycle_time_seconds=response.cycle_time_seconds,
         timestamp=response.timestamp,

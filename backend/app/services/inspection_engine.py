@@ -13,6 +13,7 @@ import numpy as np
 
 from app.services.harness_graph_service import HarnessGraphService
 from app.services.harness_segmentation_service import HarnessSegmentationService, ImageArray
+from app.services.feature_extraction_service import FeatureExtractionService
 
 InspectionStatus = Literal["PASS", "FAIL", "REVIEW_REQUIRED", "NOT_EVALUATED"]
 SUPPORTED_MODEL_SUFFIXES = {".pt", ".onnx", ".engine", ".weights", ".pth", ".pb", ".tflite"}
@@ -119,9 +120,10 @@ class InspectionResult:
     branch_pair_distances: list[BranchPairMeasurement]
     processing_time_ms: float
     configuration: dict[str, Any] = field(default_factory=dict)
+    features: Any | None = None
 
     def to_summary_dict(self) -> dict[str, Any]:
-        return {
+        data = {
             "inspection_id": self.inspection_id,
             "timestamp": self.timestamp.isoformat(),
             "overall_status": self.overall_status,
@@ -220,6 +222,13 @@ class InspectionResult:
             "processing_time_ms": round(self.processing_time_ms, 2),
             "configuration": self.configuration,
         }
+        if self.features is not None:
+            data["features"] = (
+                self.features.model_dump()
+                if hasattr(self.features, "model_dump")
+                else self.features
+            )
+        return data
 
 
 class InspectionEngine:
@@ -265,6 +274,14 @@ class InspectionEngine:
 
         segmentation = segmentation_service.segment(image.copy())
         graph = graph_service.analyse(segmentation.binary_mask, base_image=image)
+        feature_service = FeatureExtractionService(
+            segmentation_service=segmentation_service,
+            graph_service=graph_service,
+        )
+        features = feature_service.extract_features(
+            image.copy(),
+            mask=segmentation.binary_mask,
+        )
         annotated = self._annotate_result(graph.overlay_image, graph.total_wire_length_pixels)
         branches = [
             BranchMeasurement(
@@ -347,6 +364,20 @@ class InspectionEngine:
                 unit="count",
                 method="Skeleton pixels with one 8-connected neighbour",
             ),
+            MeasurementValue(
+                measurement_id="M-STRAIGHTNESS",
+                name="Mean branch straightness ratio",
+                value=features.geometric_features.mean_branch_straightness,
+                unit="ratio",
+                method="Straight euclidean distance divided by along-skeleton path length",
+            ),
+            MeasurementValue(
+                measurement_id="M-MAX-BEND",
+                name="Maximum local bend angle",
+                value=features.geometric_features.max_bend_angle_deg,
+                unit="degrees",
+                method="Discrete windowed angle analysis along wire centerline",
+            ),
         ]
         rules = self._rule_results(segmentation.occupied_percentage, graph)
         warnings = [
@@ -379,6 +410,7 @@ class InspectionEngine:
             branch_pair_distances=branch_pair_distances,
             processing_time_ms=(time.perf_counter() - started) * 1000.0,
             configuration=resolved_config,
+            features=features,
         )
 
     def _discover_model_status(self) -> ModelStatus:

@@ -5,6 +5,7 @@ class SegmentationImages(BaseModel):
     binary_mask: str
     contour_image: str
     skeleton_image: str
+    isolated_harness: str | None = None
 
 
 class SegmentationMetrics(BaseModel):

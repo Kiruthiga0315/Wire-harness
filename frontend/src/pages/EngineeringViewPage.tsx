@@ -15,6 +15,7 @@ import { EngineeringCheckpointEditor } from '../components/EngineeringCheckpoint
 import { ColorInspectionPanel } from '../components/ColorInspectionPanel'
 import { HarnessGraphPanel } from '../components/HarnessGraphPanel'
 import { WireColorIdentificationPanel } from '../components/WireColorIdentificationPanel'
+import { FeatureExtractionPanel } from '../components/FeatureExtractionPanel'
 import { PageHeader } from '../components/PageHeader'
 import { StatusPill } from '../components/StatusPill'
 import { useInspection } from '../context/InspectionContext'
@@ -24,6 +25,7 @@ import type { SegmentationResponse } from '../types/engineering'
 const MAX_UPLOAD_BYTES = 15 * 1024 * 1024
 
 const resultPanels = [
+  { key: 'isolated_harness', title: 'Isolated harness', description: 'Harness isolated from background markings', icon: Beaker },
   { key: 'binary_mask', title: 'Binary mask', description: 'Cleaned dark-object segmentation', icon: Binary },
   { key: 'contour_image', title: 'Contour image', description: 'Wire contours in red', icon: Boxes },
   { key: 'skeleton_image', title: 'Skeleton', description: 'Single-pixel centreline representation', icon: Network },
@@ -46,6 +48,9 @@ export function EngineeringViewPage() {
     try {
       const response = await runDemoSegmentation(signal)
       setResult(response)
+      // Automatically refresh checkpoints and trigger colour inspection
+      setEditorRefreshTrigger((v) => v + 1)
+      setColorRefreshTrigger((v) => v + 1)
     } catch (processingError) {
       if (processingError instanceof DOMException && processingError.name === 'AbortError') return
       setError(processingError instanceof Error ? processingError.message : 'Segmentation failed.')
@@ -61,7 +66,7 @@ export function EngineeringViewPage() {
     return () => controller.abort()
   }, [processImage, activeVersion, syncingActiveImage])
 
-  const handleUpload = (event: ChangeEvent<HTMLInputElement>) => {
+  const handleUpload = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
     const isImage = file.type.startsWith('image/') || /\.(jpe?g|png|bmp)$/i.test(file.name)
@@ -75,8 +80,21 @@ export function EngineeringViewPage() {
       event.target.value = ''
       return
     }
-    void uploadActiveImageFile(file)
-    event.target.value = ''
+    try {
+      await uploadActiveImageFile(file)
+      // Automatically synchronize checkpoints to the new workpiece dimensions and feature points
+      try {
+        await syncCheckpointsFromGolden('DEMO-HARNESS-001', true, true)
+        setEditorRefreshTrigger((v) => v + 1)
+        setColorRefreshTrigger((v) => v + 1)
+      } catch (syncErr) {
+        console.warn('Auto checkpoint sync warning:', syncErr)
+      }
+    } catch (uploadErr) {
+      setError(uploadErr instanceof Error ? uploadErr.message : 'Image upload failed.')
+    } finally {
+      event.target.value = ''
+    }
   }
 
   const handleLoadDemo = async () => {
@@ -111,8 +129,8 @@ export function EngineeringViewPage() {
     setColorRefreshTrigger((v) => v + 1)
   }, [])
 
-  const imageWidth = image?.width ?? result?.metrics.image_width ?? 681
-  const imageHeight = image?.height ?? result?.metrics.image_height ?? 1584
+  const imageWidth = image?.width ?? result?.metrics.image_width ?? 1800
+  const imageHeight = image?.height ?? result?.metrics.image_height ?? 560
   const activeWorkpieceUrl = image?.url || `${ACTIVE_IMAGE_URL}?v=${activeVersion}`
 
   return (
@@ -262,6 +280,8 @@ export function EngineeringViewPage() {
       <WireColorIdentificationPanel />
 
       <HarnessGraphPanel />
+
+      <FeatureExtractionPanel />
 
       {result && <article className="panel method-panel"><p className="eyebrow">CURRENT METHOD</p><h2>OpenCV feasibility pipeline</h2><p>{result.method}.</p><div className="pipeline-steps"><span>1 · Grayscale</span><span>2 · Gaussian blur</span><span>3 · Inverted Otsu</span><span>4 · Morphological close</span><span>5 · Component cleanup</span><span>6 · Contours</span><span>7 · Skeletonize</span></div><small>{result.disclaimer}</small></article>}
     </>

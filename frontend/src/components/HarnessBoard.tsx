@@ -1,5 +1,5 @@
 import { Crosshair, RotateCcw, Scan, ZoomIn, ZoomOut } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import type { MouseEvent as ReactMouseEvent, WheelEvent as ReactWheelEvent } from 'react'
 import type { MockCheckpointResult } from '../types/inspection'
 
@@ -38,9 +38,9 @@ export function HarnessBoard({
   const dragStartPosRef = useRef({ x: 0, y: 0 })
   const wasDraggedRef = useRef(false)
 
-  const imageWidth = width ?? 681
-  const imageHeight = height ?? 1584
-  const isWideCamera = imageWidth > 1200
+  const imageWidth = width ?? 1800
+  const imageHeight = height ?? 560
+  const isWideCamera = imageWidth >= imageHeight
 
   const handleZoomIn = () => {
     setZoom((prev) => Math.min(4, Math.round((prev + 0.3) * 10) / 10))
@@ -60,24 +60,9 @@ export function HarnessBoard({
   }
 
   const handleFocusHarness = () => {
-    // Focus in on the harness board in the center of the camera view
-    setZoom(2.2)
-    setPan({ x: 0, y: -40 })
+    setZoom(1.8)
+    setPan({ x: 0, y: 0 })
   }
-
-  // Auto-focus on wire harness table when starting inspection
-  useEffect(() => {
-    if (processing && isWideCamera) {
-      handleFocusHarness()
-    }
-  }, [processing, isWideCamera])
-
-  // Also auto-focus on table when wide camera image is initially detected
-  useEffect(() => {
-    if (isWideCamera) {
-      handleFocusHarness()
-    }
-  }, [isWideCamera, imageUrl])
 
   if (!imageUrl) {
     return (
@@ -172,9 +157,9 @@ export function HarnessBoard({
         <div className="harness-zoom-divider" />
         <button
           type="button"
-          className={`harness-zoom-btn ${zoom >= 2 ? 'harness-zoom-btn--active' : ''}`}
+          className={`harness-zoom-btn ${zoom >= 1.8 ? 'harness-zoom-btn--active' : ''}`}
           onClick={handleFocusHarness}
-          title="Focus on Harness Table (2.2x)"
+          title="Focus on Harness Table (1.8x)"
           aria-label="Focus on Harness Table"
         >
           <Scan size={14} />
@@ -197,6 +182,10 @@ export function HarnessBoard({
           className="harness-image-frame"
           style={{
             aspectRatio: `${imageWidth} / ${imageHeight}`,
+            width: isWideCamera ? '100%' : 'auto',
+            height: isWideCamera ? 'auto' : '100%',
+            maxWidth: '100%',
+            maxHeight: '100%',
             transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
             transformOrigin: 'center center',
             transition: isPanning ? 'none' : 'transform 0.15s ease-out',
@@ -208,6 +197,7 @@ export function HarnessBoard({
             draggable={false}
             onLoad={(event) => onLoad(event.currentTarget.naturalWidth, event.currentTarget.naturalHeight)}
             onError={onError}
+            style={{ width: '100%', height: '100%', display: 'block', objectFit: 'fill', pointerEvents: 'none' }}
           />
           {results.map((result) => (
             <button
@@ -215,10 +205,10 @@ export function HarnessBoard({
               className={`inspection-result-box inspection-result-box--${result.status.toLowerCase()} ${selectedCheckpointId === result.checkpoint_id ? 'inspection-result-box--selected' : ''}`}
               key={result.checkpoint_id}
               style={{
-                left: `${result.bounding_box.x * 100 / imageWidth}%`,
-                top: `${result.bounding_box.y * 100 / imageHeight}%`,
-                width: `${result.bounding_box.width * 100 / imageWidth}%`,
-                height: `${result.bounding_box.height * 100 / imageHeight}%`,
+                left: `${(result.bounding_box.x * 100) / imageWidth}%`,
+                top: `${(result.bounding_box.y * 100) / imageHeight}%`,
+                width: `${(result.bounding_box.width * 100) / imageWidth}%`,
+                height: `${(result.bounding_box.height * 100) / imageHeight}%`,
               }}
               onClick={() => handleCheckpointClick(result)}
               aria-label={`${result.checkpoint_id} ${result.status}: ${result.checkpoint_name}`}
@@ -231,7 +221,7 @@ export function HarnessBoard({
             <div className="inspection-processing-overlay">
               <i />
               <strong>ANALYSING WIRE HARNESS</strong>
-              <span>Focused on inspection table · Evaluating 12 checkpoints</span>
+              <span>Evaluating {results.length || 35} checkpoints</span>
             </div>
           )}
         </div>

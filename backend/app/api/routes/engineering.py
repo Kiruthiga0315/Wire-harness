@@ -11,6 +11,10 @@ from app.core.database import get_db
 from app.models import Checkpoint
 from app.schemas.checkpoint import CheckpointRead
 from app.schemas.wire_color import WireColorIdentificationResponse
+from app.schemas.feature_extraction import (
+    FeatureExtractionRequest,
+    FeatureExtractionResponse,
+)
 from app.schemas.color_inspection import (
     ColorInspectionRequest,
     ColorInspectionResponse,
@@ -51,7 +55,12 @@ segmentation_service = HarnessSegmentationService()
 color_inspection_service = ColorInspectionService()
 harness_graph_service = HarnessGraphService()
 from app.services.wire_color_service import WireColorIdentificationService
+from app.services.feature_extraction_service import FeatureExtractionService
 wire_color_service = WireColorIdentificationService(segmentation_service=segmentation_service)
+feature_extraction_service = FeatureExtractionService(
+    segmentation_service=segmentation_service,
+    graph_service=harness_graph_service,
+)
 
 
 def _png_data_url(image: ImageArray) -> str:
@@ -70,7 +79,7 @@ def _png_data_url(image: ImageArray) -> str:
 def segment_demo_image() -> SegmentationResponse:
     active = active_image_service.get_active_image()
     try:
-        result = segmentation_service.segment(active.bgr_image)
+        result = segmentation_service.segment(active.bgr_image, filename=active.filename)
     except (ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=422, detail=f"Segmentation failed: {exc}") from exc
 
@@ -95,6 +104,7 @@ def segment_demo_image() -> SegmentationResponse:
             binary_mask=_png_data_url(result.binary_mask),
             contour_image=_png_data_url(result.contour_image),
             skeleton_image=_png_data_url(result.skeleton_image),
+            isolated_harness=_png_data_url(result.isolated_harness_image) if result.isolated_harness_image is not None else None,
         ),
     )
 
@@ -138,8 +148,15 @@ def inspect_checkpoint_colour(
     )
     if checkpoint is None:
         raise HTTPException(status_code=404, detail="Checkpoint not found")
-    if not checkpoint.expected_value:
-        raise HTTPException(status_code=422, detail="Checkpoint has no expected colour")
+    expected_col = payload.expected_colour
+    if not expected_col:
+        val = (checkpoint.expected_value or "").strip().upper()
+        if val in ("BLACK", "WHITE", "BLUE", "RED", "GREEN", "YELLOW", "ORANGE", "GREY", "GRAY"):
+            expected_col = val
+        elif checkpoint.category == "Tape" or checkpoint.inspection_type == "Colour":
+            expected_col = "BLUE"
+        else:
+            expected_col = "BLACK"
 
     active = active_image_service.get_active_image()
     image = active.bgr_image
@@ -147,7 +164,7 @@ def inspect_checkpoint_colour(
     try:
         result = color_inspection_service.inspect(
             image,
-            expected_colour=checkpoint.expected_value,
+            expected_colour=expected_col,
             center_x=checkpoint.reference_x,
             center_y=checkpoint.reference_y,
             roi_width=checkpoint.roi_width,
@@ -493,4 +510,50 @@ def identify_wire_colors() -> WireColorIdentificationResponse:
         )
     except (ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=422, detail=f"Wire colour identification failed: {exc}") from exc
+
+
+@router.post(
+    "/feature-extraction",
+    response_model=FeatureExtractionResponse,
+    summary="Extract visual and geometric features from the active wire harness image",
+)
+def extract_active_image_features(
+    payload: FeatureExtractionRequest | None = None,
+) -> FeatureExtractionResponse:
+    active = active_image_service.get_active_image()
+    try:
+        return feature_extraction_service.extract_features(
+            active.bgr_image,
+            config=payload or FeatureExtractionRequest(),
+        )
+    except (ValueError, RuntimeError) as exc:
+        raise HTTPException(status_code=422, detail=f"Feature extraction failed: {exc}") from exc
+
+
+@router.post(
+    "/feature-extraction/demo",
+    response_model=FeatureExtractionResponse,
+    summary="Extract visual and geometric features from the demo wire harness image",
+)
+def extract_demo_image_features(
+    payload: FeatureExtractionRequest | None = None,
+) -> FeatureExtractionResponse:
+    demo_path = resolve_demo_image()
+    if demo_path is not None and demo_path.is_file():
+        image = cv2.imread(str(demo_path), cv2.IMREAD_COLOR)
+        if image is None:
+            active = active_image_service.get_active_image()
+            image = active.bgr_image
+    else:
+        active = active_image_service.get_active_image()
+        image = active.bgr_image
+
+    try:
+        return feature_extraction_service.extract_features(
+            image,
+            config=payload or FeatureExtractionRequest(),
+        )
+    except (ValueError, RuntimeError) as exc:
+        raise HTTPException(status_code=422, detail=f"Feature extraction failed: {exc}") from exc
+
 

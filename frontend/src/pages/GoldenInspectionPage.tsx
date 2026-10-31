@@ -537,7 +537,7 @@ export function GoldenInspectionPage() {
                   </span>
                   <div style={{ flex: 1, width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
                     <img
-                      src={GOLDEN_HARNESS_URL}
+                      src={`${GOLDEN_HARNESS_URL}?v=${Date.now()}`}
                       alt="Golden harness baseline"
                       style={{ maxHeight: '100%', maxWidth: '100%', objectFit: 'contain', borderRadius: 4 }}
                     />
@@ -584,7 +584,7 @@ export function GoldenInspectionPage() {
             {viewMode === 'golden' && (
               <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <img
-                  src={GOLDEN_HARNESS_URL}
+                  src={`${GOLDEN_HARNESS_URL}?v=${Date.now()}`}
                   alt="Golden harness baseline"
                   style={{ maxHeight: '100%', maxWidth: '100%', objectFit: 'contain' }}
                 />
