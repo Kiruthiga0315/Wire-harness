@@ -64,18 +64,23 @@ export function WireColorIdentificationPanel() {
     if (!result) return ''
     if (!showOverlays || viewMode === 'original') return result.original_image
     if (viewMode === 'dark_blue' && result.color_masks?.dark_blue) return result.color_masks.dark_blue
-    if (viewMode === 'grey' && result.color_masks?.grey) return result.color_masks.grey
+    if (viewMode === 'grey' && (result.color_masks?.grey || result.color_masks?.gray)) {
+      return result.color_masks.grey || result.color_masks.gray || ''
+    }
     if (viewMode === 'black' && result.color_masks?.black) return result.color_masks.black
     if (viewMode === 'green' && result.color_masks?.green) return result.color_masks.green
+    // If a specific colour filter is selected but no isolated mask is available, use original_image so other colours don't show!
+    if (viewMode !== 'all') return result.original_image
     return result.overlay_image
   }
 
-  // Filter sections according to active view mode
+  // Filter sections according to active view mode with robust normalization
   const visibleSections = result?.sections.filter((s) => {
-    if (viewMode === 'dark_blue') return s.color_id === 'dark_blue'
-    if (viewMode === 'grey') return s.color_id === 'grey'
-    if (viewMode === 'black') return s.color_id === 'black'
-    if (viewMode === 'green') return s.color_id === 'green'
+    const norm = (s.color_id || '').trim().toLowerCase().replace(/[-_]+/g, ' ')
+    if (viewMode === 'dark_blue') return norm === 'dark blue'
+    if (viewMode === 'grey') return norm === 'grey' || norm === 'gray'
+    if (viewMode === 'black') return norm === 'black'
+    if (viewMode === 'green') return norm === 'green'
     return true
   }) ?? []
 

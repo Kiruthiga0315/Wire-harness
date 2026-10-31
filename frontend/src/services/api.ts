@@ -5,6 +5,7 @@ import type { MockInspectionResponse } from '../types/inspection'
 import type { ColorInspectionResponse } from '../types/colorInspection'
 import type { InspectionReportResponse, StickerInspectionReport } from '../types/report'
 import type { WireColorIdentificationResponse } from '../types/wireColor' 
+import type { ColourIdentificationResponse } from '../types/colourIdentification'
 
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
 const DEMO_IMAGE_PATH = '/api/test-images/harness_sample_01.jpeg'
@@ -534,5 +535,31 @@ export async function downloadGoldenReportPdf(): Promise<void> {
   } catch (error) {
     if (error instanceof ApiError) throw error
     throw new ApiError('Unable to download PDF inspection certificate.')
+  }
+}
+
+export async function runColourIdentification(signal?: AbortSignal): Promise<ColourIdentificationResponse> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/colour-identification/analyse`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+      signal,
+    })
+    if (!response.ok) {
+      let message = 'Colour identification analysis failed.'
+      try {
+        const payload = await response.json() as { detail?: string }
+        if (payload.detail) message = payload.detail
+      } catch {
+        // Preserve fallback message
+      }
+      throw new ApiError(message, response.status)
+    }
+    return (await response.json()) as ColourIdentificationResponse
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') throw error
+    if (error instanceof ApiError) throw error
+    throw new ApiError('Colour identification service unavailable. Check that the backend is running.')
   }
 }

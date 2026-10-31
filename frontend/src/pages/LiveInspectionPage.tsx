@@ -12,6 +12,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { ChangeEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { HarnessBoard } from '../components/HarnessBoard'
+import { ColourIdentificationPanel } from '../components/ColourIdentificationPanel'
 import { PageHeader } from '../components/PageHeader'
 import { StatusPill } from '../components/StatusPill'
 import { useInspection } from '../context/InspectionContext'
@@ -355,6 +356,8 @@ export function LiveInspectionPage() {
           <div className="phase-notice"><strong>INSPECTION STATION</strong><span>Visual inspection results and automated sticker OCR verification.</span></div>
         </aside>
       </section>
+
+      {image && <ColourIdentificationPanel />}
     </>
   )
 }

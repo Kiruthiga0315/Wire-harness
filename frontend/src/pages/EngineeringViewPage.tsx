@@ -13,6 +13,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ChangeEvent } from 'react'
 import { EngineeringCheckpointEditor } from '../components/EngineeringCheckpointEditor'
 import { ColorInspectionPanel } from '../components/ColorInspectionPanel'
+import { ColourIdentificationPanel } from '../components/ColourIdentificationPanel'
 import { HarnessGraphPanel } from '../components/HarnessGraphPanel'
 import { WireColorIdentificationPanel } from '../components/WireColorIdentificationPanel'
 import { PageHeader } from '../components/PageHeader'
@@ -211,6 +212,8 @@ export function EngineeringViewPage() {
       />
 
       <ColorInspectionPanel refreshTrigger={colorRefreshTrigger} />
+
+      <ColourIdentificationPanel />
 
       <div className="engineering-section-title">
         <div>
