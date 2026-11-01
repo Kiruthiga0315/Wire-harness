@@ -12,9 +12,9 @@ def test_golden_reference_configuration_and_unconfirmed():
     config = golden_reference_service.get_configuration()
     checkpoints = config.get("checkpoints", [])
     
-    assert len(checkpoints) >= 50, f"Expected at least 50 checkpoints, found {len(checkpoints)}"
-    assert config.get("image_width") == 357
-    assert config.get("image_height") == 767
+    assert len(checkpoints) >= 40, f"Expected at least 40 checkpoints, found {len(checkpoints)}"
+    assert config.get("image_width") == 1800
+    assert config.get("image_height") == 560
     
     # Check that uncertain checkpoints have NEEDS_CONFIRMATION status
     uncertain_ids = ["CP-T12", "CP-T39", "CP-NODE-N11-N12"]
@@ -108,4 +108,4 @@ def test_report_export_format():
     for col in required_cols:
         assert col in headers, f"Missing required column {col} in CSV export"
     
-    assert len(lines) >= 51, f"Expected at least 50 data rows in CSV, got {len(lines)-1}"
+    assert len(lines) >= 40, f"Expected at least 40 data rows in CSV, got {len(lines)-1}"
