@@ -12,6 +12,7 @@ from numpy.typing import NDArray
 
 from app.services.calibration_service import resolve_calibration
 from app.services.golden_inspection_service import golden_inspection_service
+from app.services.golden_reference_service import golden_reference_service
 from app.services.rules.families.gates import evaluate_pre_gates
 from app.services.rules.loader import rule_pack_loader
 from app.services.rules.registry import rule_registry
@@ -59,12 +60,31 @@ class RuleEngine:
         )
         # If image quality metrics were pre-computed in context:
         if context.vision.image_quality.failure_reasons:
-            # Overwrite image quality result
             for r in pre_gate_results:
                 if r.rule_id == "GATE-IMAGE-QUALITY":
-                    r.status = "FAIL"
-                    r.reason = f"Image quality gate failed: {'; '.join(context.vision.image_quality.failure_reasons)}"
+                    r.status = "REVIEW"
+                    r.reason = f"Image quality gate failed: {'; '.join(context.vision.image_quality.failure_reasons)}. Re-capture required."
                     r.reaction_plan = REACTION_PLAN_SEGREGATE
+
+        gate_failed = [r for r in pre_gate_results if r.status != "PASS"]
+        if gate_failed:
+            # Per factory specification (Step 3F): Pre-gate failure yields HOLD with re-capture reason
+            all_results.extend(pre_gate_results)
+            verdict, summary, reasons = self.aggregate_disposition(all_results)
+            return HarnessVerdict(
+                verdict_id=verdict_id,
+                timestamp=timestamp,
+                verdict="HOLD",
+                variant=context.variant,
+                part_no=context.part_no,
+                rule_pack_version="1.0.0",
+                calibration_provenance=context.vision.calibration_provenance,
+                image_hash=context.image_hash,
+                summary=summary,
+                reasons=[f"HOLD [{r.rule_id}] ({r.status}): {r.reason}" for r in gate_failed],
+                rule_results=all_results,
+                reaction_plan=REACTION_PLAN_SEGREGATE,
+            )
 
         all_results.extend(pre_gate_results)
 
@@ -144,9 +164,15 @@ class RuleEngine:
         )
         align_conf = getattr(inspection_out, "alignment_confidence", 1.0)
         
+        golden_cfg = golden_reference_service.get_configuration()
+        ref_cp_map = {c.get("checkpoint_id"): c for c in golden_cfg.get("checkpoints", [])}
+
         # Checkpoints mapping
         checkpoints: list[dict[str, Any]] = []
         for cp in getattr(inspection_out, "results", []):
+            ref_meta = ref_cp_map.get(cp.checkpoint_id, {})
+            ref_status = ref_meta.get("status", cp.status)
+            effective_status = "NEEDS_CONFIRMATION" if ref_status == "NEEDS_CONFIRMATION" else cp.status
             checkpoints.append({
                 "checkpoint_id": cp.checkpoint_id,
                 "name": cp.checkpoint_id,
@@ -161,7 +187,11 @@ class RuleEngine:
                 "unit": getattr(cp, "unit", "mm"),
                 "tolerance": cp.tolerance,
                 "deviation": cp.deviation,
-                "status": cp.status,
+                "status": effective_status,
+                "source": ref_meta.get("source", "placeholder"),
+                "source_line": ref_meta.get("source_line"),
+                "placeholder": ref_meta.get("placeholder", False),
+                "notes": ref_meta.get("notes", ""),
                 "confidence": getattr(cp, "confidence", 1.0),
                 "message": getattr(cp, "message", ""),
                 "roi_bbox": getattr(cp, "roi_bbox", None),

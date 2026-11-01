@@ -31,7 +31,10 @@
       "confidence": 0.95,
       "status": "CONFIRMED",
       "notes": "N1 - N2 = 28.5 cm",
-      "baseline_mm": 119.1
+      "baseline_mm": 119.1,
+      "source": "detailed.md:28",
+      "source_line": "28",
+      "placeholder": false
     },
     {
       "checkpoint_id": "CP-NODE-N03-N04",
@@ -50,7 +53,10 @@
       "confidence": 0.95,
       "status": "CONFIRMED",
       "notes": "N3 - N4 = 10 cm",
-      "baseline_mm": 119.1
+      "baseline_mm": 119.1,
+      "source": "factory_sheet",
+      "source_line": "measurement_sheet.png:N3-N4",
+      "placeholder": false
     },
     {
       "checkpoint_id": "CP-NODE-N05-N06",
@@ -69,7 +75,10 @@
       "confidence": 0.95,
       "status": "CONFIRMED",
       "notes": "N5 - N6 = 53.8 cm",
-      "baseline_mm": 12.0
+      "baseline_mm": 12.0,
+      "source": "detailed.md:28",
+      "source_line": "28",
+      "placeholder": false
     },
     {
       "checkpoint_id": "CP-NODE-N07-N08",
@@ -88,7 +97,10 @@
       "confidence": 0.95,
       "status": "CONFIRMED",
       "notes": "N7 - N8 = 8 cm",
-      "baseline_mm": 26.5
+      "baseline_mm": 26.5,
+      "source": "factory_sheet",
+      "source_line": "measurement_sheet.png:N7-N8",
+      "placeholder": false
     },
     {
       "checkpoint_id": "CP-NODE-N09-N10",
@@ -107,7 +119,10 @@
       "confidence": 0.95,
       "status": "CONFIRMED",
       "notes": "N9 - N10 = 23.5 cm",
-      "baseline_mm": 13.0
+      "baseline_mm": 13.0,
+      "source": "factory_sheet",
+      "source_line": "measurement_sheet.png:N9-N10",
+      "placeholder": false
     },
     {
       "checkpoint_id": "CP-NODE-N11-N12",
@@ -126,7 +141,10 @@
       "confidence": 0.95,
       "status": "NEEDS_CONFIRMATION",
       "notes": "N11 - N12 = 60.5 cm",
-      "baseline_mm": 605.0
+      "baseline_mm": 605.0,
+      "source": "placeholder",
+      "source_line": null,
+      "placeholder": true
     },
     {
       "checkpoint_id": "CP-T01",
@@ -145,7 +163,10 @@
       "confidence": 0.95,
       "status": "CONFIRMED",
       "notes": "J1 - T1 = 39 cm",
-      "baseline_mm": 69.1
+      "baseline_mm": 69.1,
+      "source": "detailed.md:27",
+      "source_line": "27",
+      "placeholder": false
     },
     {
       "checkpoint_id": "CP-T02",
@@ -164,7 +185,10 @@
       "confidence": 0.95,
       "status": "CONFIRMED",
       "notes": "J1 - T2 = 46 cm",
-      "baseline_mm": 30.8
+      "baseline_mm": 30.8,
+      "source": "detailed.md:27",
+      "source_line": "27",
+      "placeholder": false
     },
     {
       "checkpoint_id": "CP-T03",
@@ -183,7 +207,10 @@
       "confidence": 0.95,
       "status": "CONFIRMED",
       "notes": "J1 - T3 = 39 cm",
-      "baseline_mm": 84.8
+      "baseline_mm": 84.8,
+      "source": "factory_sheet",
+      "source_line": "measurement_sheet.png:J1-T3",
+      "placeholder": false
     },
     {
       "checkpoint_id": "CP-T04",
@@ -202,7 +229,10 @@
       "confidence": 0.95,
       "status": "CONFIRMED",
       "notes": "J1 - T4 = 39 cm",
-      "baseline_mm": 6.7
+      "baseline_mm": 6.7,
+      "source": "detailed.md:27",
+      "source_line": "27",
+      "placeholder": false
     },
     {
       "checkpoint_id": "CP-T05",
@@ -221,7 +251,10 @@
       "confidence": 0.95,
       "status": "CONFIRMED",
       "notes": "J1 - T5 = 39 cm",
-      "baseline_mm": 6.5
+      "baseline_mm": 6.5,
+      "source": "factory_sheet",
+      "source_line": "measurement_sheet.png:J2-T5",
+      "placeholder": false
     },
     {
       "checkpoint_id": "CP-T06",
@@ -240,7 +273,10 @@
       "confidence": 0.95,
       "status": "CONFIRMED",
       "notes": "J2 - T6 = 20 cm",
-      "baseline_mm": 33.3
+      "baseline_mm": 33.3,
+      "source": "factory_sheet",
+      "source_line": "measurement_sheet.png:J2-T6",
+      "placeholder": false
     },
     {
       "checkpoint_id": "CP-T07",
@@ -259,7 +295,10 @@
       "confidence": 0.95,
       "status": "CONFIRMED",
       "notes": "J3 - T7 = 18 cm",
-      "baseline_mm": 27.8
+      "baseline_mm": 27.8,
+      "source": "factory_sheet",
+      "source_line": "measurement_sheet.png:J3-T7",
+      "placeholder": false
     },
     {
       "checkpoint_id": "CP-T08",
@@ -278,7 +317,10 @@
       "confidence": 0.95,
       "status": "CONFIRMED",
       "notes": "J8 - T8 = 7 cm",
-      "baseline_mm": 35.0
+      "baseline_mm": 35.0,
+      "source": "factory_sheet",
+      "source_line": "measurement_sheet.png:J3-T8",
+      "placeholder": false
     },
     {
       "checkpoint_id": "CP-T09",
@@ -297,7 +339,10 @@
       "confidence": 0.95,
       "status": "NEEDS_CONFIRMATION",
       "notes": "Manually placed checkpoint",
-      "baseline_mm": 150.0
+      "baseline_mm": 150.0,
+      "source": "placeholder",
+      "source_line": null,
+      "placeholder": true
     },
     {
       "checkpoint_id": "CP-T10",
@@ -316,7 +361,10 @@
       "confidence": 0.95,
       "status": "NEEDS_CONFIRMATION",
       "notes": "Manually placed checkpoint",
-      "baseline_mm": 150.0
+      "baseline_mm": 150.0,
+      "source": "placeholder",
+      "source_line": null,
+      "placeholder": true
     },
     {
       "checkpoint_id": "CP-T11",
@@ -335,7 +383,10 @@
       "confidence": 0.95,
       "status": "NEEDS_CONFIRMATION",
       "notes": "Manually placed checkpoint",
-      "baseline_mm": 150.0
+      "baseline_mm": 150.0,
+      "source": "placeholder",
+      "source_line": null,
+      "placeholder": true
     },
     {
       "checkpoint_id": "CP-T12",
@@ -354,7 +405,10 @@
       "confidence": 0.95,
       "status": "NEEDS_CONFIRMATION",
       "notes": "Manually placed checkpoint",
-      "baseline_mm": 150.0
+      "baseline_mm": 150.0,
+      "source": "placeholder",
+      "source_line": null,
+      "placeholder": true
     },
     {
       "checkpoint_id": "CP-T13",
@@ -373,7 +427,10 @@
       "confidence": 0.95,
       "status": "NEEDS_CONFIRMATION",
       "notes": "Manually placed checkpoint",
-      "baseline_mm": 150.0
+      "baseline_mm": 150.0,
+      "source": "placeholder",
+      "source_line": null,
+      "placeholder": true
     },
     {
       "checkpoint_id": "CP-T14",
@@ -392,7 +449,10 @@
       "confidence": 0.95,
       "status": "NEEDS_CONFIRMATION",
       "notes": "Manually placed checkpoint",
-      "baseline_mm": 150.0
+      "baseline_mm": 150.0,
+      "source": "placeholder",
+      "source_line": null,
+      "placeholder": true
     },
     {
       "checkpoint_id": "CP-T15",
@@ -411,7 +471,10 @@
       "confidence": 0.95,
       "status": "NEEDS_CONFIRMATION",
       "notes": "Manually placed checkpoint",
-      "baseline_mm": 150.0
+      "baseline_mm": 150.0,
+      "source": "placeholder",
+      "source_line": null,
+      "placeholder": true
     },
     {
       "checkpoint_id": "CP-T16",
@@ -430,7 +493,10 @@
       "confidence": 0.95,
       "status": "NEEDS_CONFIRMATION",
       "notes": "Manually placed checkpoint",
-      "baseline_mm": 150.0
+      "baseline_mm": 150.0,
+      "source": "placeholder",
+      "source_line": null,
+      "placeholder": true
     },
     {
       "checkpoint_id": "CP-T17",
@@ -449,7 +515,10 @@
       "confidence": 0.95,
       "status": "NEEDS_CONFIRMATION",
       "notes": "Manually placed checkpoint",
-      "baseline_mm": 150.0
+      "baseline_mm": 150.0,
+      "source": "placeholder",
+      "source_line": null,
+      "placeholder": true
     },
     {
       "checkpoint_id": "CP-T18",
@@ -468,7 +537,10 @@
       "confidence": 0.95,
       "status": "NEEDS_CONFIRMATION",
       "notes": "Manually placed checkpoint",
-      "baseline_mm": 150.0
+      "baseline_mm": 150.0,
+      "source": "placeholder",
+      "source_line": null,
+      "placeholder": true
     },
     {
       "checkpoint_id": "CP-T19",
@@ -487,7 +559,10 @@
       "confidence": 0.95,
       "status": "NEEDS_CONFIRMATION",
       "notes": "Manually placed checkpoint",
-      "baseline_mm": 150.0
+      "baseline_mm": 150.0,
+      "source": "placeholder",
+      "source_line": null,
+      "placeholder": true
     },
     {
       "checkpoint_id": "CP-T20",
@@ -506,7 +581,10 @@
       "confidence": 0.95,
       "status": "NEEDS_CONFIRMATION",
       "notes": "Manually placed checkpoint",
-      "baseline_mm": 150.0
+      "baseline_mm": 150.0,
+      "source": "placeholder",
+      "source_line": null,
+      "placeholder": true
     },
     {
       "checkpoint_id": "CP-T21",
@@ -525,7 +603,10 @@
       "confidence": 0.95,
       "status": "NEEDS_CONFIRMATION",
       "notes": "Manually placed checkpoint",
-      "baseline_mm": 150.0
+      "baseline_mm": 150.0,
+      "source": "placeholder",
+      "source_line": null,
+      "placeholder": true
     },
     {
       "checkpoint_id": "CP-T22",
@@ -544,7 +625,10 @@
       "confidence": 0.95,
       "status": "NEEDS_CONFIRMATION",
       "notes": "J12 - T22 = 10 cm (reconciled missing terminal)",
-      "baseline_mm": 100.0
+      "baseline_mm": 100.0,
+      "source": "placeholder",
+      "source_line": null,
+      "placeholder": true
     },
     {
       "checkpoint_id": "CP-T23",
@@ -563,7 +647,10 @@
       "confidence": 0.95,
       "status": "NEEDS_CONFIRMATION",
       "notes": "Manually placed checkpoint",
-      "baseline_mm": 150.0
+      "baseline_mm": 150.0,
+      "source": "placeholder",
+      "source_line": null,
+      "placeholder": true
     },
     {
       "checkpoint_id": "CP-T24",
@@ -582,7 +669,10 @@
       "confidence": 0.95,
       "status": "NEEDS_CONFIRMATION",
       "notes": "Manually placed checkpoint",
-      "baseline_mm": 150.0
+      "baseline_mm": 150.0,
+      "source": "placeholder",
+      "source_line": null,
+      "placeholder": true
     },
     {
       "checkpoint_id": "CP-T25",
@@ -601,7 +691,10 @@
       "confidence": 0.95,
       "status": "NEEDS_CONFIRMATION",
       "notes": "Manually placed checkpoint",
-      "baseline_mm": 150.0
+      "baseline_mm": 150.0,
+      "source": "placeholder",
+      "source_line": null,
+      "placeholder": true
     },
     {
       "checkpoint_id": "CP-T26",
@@ -618,9 +711,12 @@
       "roi_width": 45,
       "roi_height": 45,
       "confidence": 0.95,
-      "status": "CONFIRMED",
+      "status": "NEEDS_CONFIRMATION",
       "notes": "J24 - T26 = 13 cm",
-      "baseline_mm": 29.3
+      "baseline_mm": 29.3,
+      "source": "placeholder",
+      "source_line": null,
+      "placeholder": true
     },
     {
       "checkpoint_id": "CP-T27",
@@ -637,9 +733,12 @@
       "roi_width": 45,
       "roi_height": 45,
       "confidence": 0.95,
-      "status": "CONFIRMED",
+      "status": "NEEDS_CONFIRMATION",
       "notes": "J23 - T27 = 19 cm",
-      "baseline_mm": 30.2
+      "baseline_mm": 30.2,
+      "source": "placeholder",
+      "source_line": null,
+      "placeholder": true
     },
     {
       "checkpoint_id": "CP-T28",
@@ -656,9 +755,12 @@
       "roi_width": 45,
       "roi_height": 45,
       "confidence": 0.95,
-      "status": "CONFIRMED",
+      "status": "NEEDS_CONFIRMATION",
       "notes": "J21 - T28 = 10 cm",
-      "baseline_mm": 55.6
+      "baseline_mm": 55.6,
+      "source": "placeholder",
+      "source_line": null,
+      "placeholder": true
     },
     {
       "checkpoint_id": "CP-T29",
@@ -675,9 +777,12 @@
       "roi_width": 45,
       "roi_height": 45,
       "confidence": 0.95,
-      "status": "CONFIRMED",
+      "status": "NEEDS_CONFIRMATION",
       "notes": "J21 - T29 = 16 cm",
-      "baseline_mm": 15.0
+      "baseline_mm": 15.0,
+      "source": "placeholder",
+      "source_line": null,
+      "placeholder": true
     },
     {
       "checkpoint_id": "CP-T30",
@@ -694,9 +799,12 @@
       "roi_width": 45,
       "roi_height": 45,
       "confidence": 0.95,
-      "status": "CONFIRMED",
+      "status": "NEEDS_CONFIRMATION",
       "notes": "J24 - T30 = 44 cm",
-      "baseline_mm": 27.2
+      "baseline_mm": 27.2,
+      "source": "placeholder",
+      "source_line": null,
+      "placeholder": true
     },
     {
       "checkpoint_id": "CP-T31",
@@ -713,9 +821,12 @@
       "roi_width": 45,
       "roi_height": 45,
       "confidence": 0.95,
-      "status": "CONFIRMED",
+      "status": "NEEDS_CONFIRMATION",
       "notes": "J21 - T31 = 39 cm",
-      "baseline_mm": 6.7
+      "baseline_mm": 6.7,
+      "source": "placeholder",
+      "source_line": null,
+      "placeholder": true
     },
     {
       "checkpoint_id": "CP-T32",
@@ -732,9 +843,12 @@
       "roi_width": 45,
       "roi_height": 45,
       "confidence": 0.95,
-      "status": "CONFIRMED",
+      "status": "NEEDS_CONFIRMATION",
       "notes": "J26 - T32 = 18 cm",
-      "baseline_mm": 6.7
+      "baseline_mm": 6.7,
+      "source": "placeholder",
+      "source_line": null,
+      "placeholder": true
     },
     {
       "checkpoint_id": "CP-T33",
@@ -753,7 +867,10 @@
       "confidence": 0.95,
       "status": "NEEDS_CONFIRMATION",
       "notes": "J26 - T33 = 26 cm (reconciled missing terminal)",
-      "baseline_mm": 260.0
+      "baseline_mm": 260.0,
+      "source": "placeholder",
+      "source_line": null,
+      "placeholder": true
     },
     {
       "checkpoint_id": "CP-T34",
@@ -770,9 +887,12 @@
       "roi_width": 45,
       "roi_height": 45,
       "confidence": 0.95,
-      "status": "CONFIRMED",
+      "status": "NEEDS_CONFIRMATION",
       "notes": "J26 - T34 = 20 cm",
-      "baseline_mm": 13.4
+      "baseline_mm": 13.4,
+      "source": "placeholder",
+      "source_line": null,
+      "placeholder": true
     },
     {
       "checkpoint_id": "CP-T35",
@@ -789,9 +909,12 @@
       "roi_width": 45,
       "roi_height": 45,
       "confidence": 0.95,
-      "status": "CONFIRMED",
+      "status": "NEEDS_CONFIRMATION",
       "notes": "J27 - T35 = 26 cm",
-      "baseline_mm": 36.3
+      "baseline_mm": 36.3,
+      "source": "placeholder",
+      "source_line": null,
+      "placeholder": true
     },
     {
       "checkpoint_id": "CP-T36",
@@ -810,7 +933,10 @@
       "confidence": 0.95,
       "status": "NEEDS_CONFIRMATION",
       "notes": "Manually placed checkpoint",
-      "baseline_mm": 150.0
+      "baseline_mm": 150.0,
+      "source": "placeholder",
+      "source_line": null,
+      "placeholder": true
     },
     {
       "checkpoint_id": "CP-T37",
@@ -827,9 +953,12 @@
       "roi_width": 45,
       "roi_height": 45,
       "confidence": 0.95,
-      "status": "CONFIRMED",
+      "status": "NEEDS_CONFIRMATION",
       "notes": "J29 - T37 = 12 cm",
-      "baseline_mm": 10.5
+      "baseline_mm": 10.5,
+      "source": "placeholder",
+      "source_line": null,
+      "placeholder": true
     },
     {
       "checkpoint_id": "CP-T38",
@@ -846,9 +975,12 @@
       "roi_width": 45,
       "roi_height": 45,
       "confidence": 0.95,
-      "status": "CONFIRMED",
+      "status": "NEEDS_CONFIRMATION",
       "notes": "J28 - T38 = 69 cm",
-      "baseline_mm": 49.1
+      "baseline_mm": 49.1,
+      "source": "placeholder",
+      "source_line": null,
+      "placeholder": true
     },
     {
       "checkpoint_id": "CP-T39",
@@ -867,7 +999,10 @@
       "confidence": 0.95,
       "status": "NEEDS_CONFIRMATION",
       "notes": "J28 - T39 = 15 cm",
-      "baseline_mm": 150.0
+      "baseline_mm": 150.0,
+      "source": "placeholder",
+      "source_line": null,
+      "placeholder": true
     },
     {
       "checkpoint_id": "CP-T40",
@@ -884,9 +1019,12 @@
       "roi_width": 45,
       "roi_height": 45,
       "confidence": 0.95,
-      "status": "CONFIRMED",
+      "status": "NEEDS_CONFIRMATION",
       "notes": "J31 - T40 = 23.5 cm",
-      "baseline_mm": 16.4
+      "baseline_mm": 16.4,
+      "source": "placeholder",
+      "source_line": null,
+      "placeholder": true
     },
     {
       "checkpoint_id": "CP-T41",
@@ -903,17 +1041,20 @@
       "roi_width": 45,
       "roi_height": 45,
       "confidence": 0.95,
-      "status": "CONFIRMED",
+      "status": "NEEDS_CONFIRMATION",
       "notes": "J31 - T41 = 31 cm",
-      "baseline_mm": 17.7
+      "baseline_mm": 17.7,
+      "source": "placeholder",
+      "source_line": null,
+      "placeholder": true
     }
   ],
   "specification_summary": {
     "total_checkpoints": 47,
     "total_terminals": 41,
     "total_nodes": 6,
-    "confirmed_count": 26,
-    "unconfirmed_count": 21,
+    "confirmed_count": 13,
+    "unconfirmed_count": 34,
     "unit": "mm",
     "source_unit": "cm"
   }

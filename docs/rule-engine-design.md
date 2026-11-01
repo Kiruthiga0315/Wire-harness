@@ -45,7 +45,7 @@ flowchart TD
 - **Stage 3: Operator Evidence Contextualization**:
   - Operator provides structured input from **FRM/PR/19** (associate ID, shift, date, total production qty, label serials used/scrapped, first/last piece inspection states).
   - Operator provides taping parameters per branch (measured cycle time in seconds, finished turn/lap count).
-  - Pluggable adapters support future automated inputs (e.g. DSI electrical testing software, automated taping counters).
+  - Pluggable adapters support future automated inputs (e.g. DSI software, automated taping counters).
 - **Stage 4: Rule Engine Execution**:
   - Declarative rule specifications loaded from validated YAML packs (`data/rules/*.yaml`).
   - Rules execute against the combined `InspectionContext`.
@@ -206,13 +206,13 @@ Classified by nominal dimension $L_{\text{nominal}}$ (inclusive bounds):
 
 ## 7. Assumptions to Confirm with Factory
 
-The following assumptions have been made based on standard automotive harness engineering practices and need formal confirmation with MSIL / YAZAKI plant quality engineering:
+The following assumptions require formal confirmation with plant quality engineering at Motherson (customer: MSIL):
 
 1. **Subject-to-Column Mapping in MSIL Tolerance Table**:
    - `Protector-Clip`, `Protector-Protector`, and `Clamp-Clamp` are mapped to the **Clamp-to-Clamp** column ($\pm 5$ to $\pm 10\text{ mm}$).
    - `Clip-Branch wire` and `Protector-Branch wire` are mapped to the **Main Trunk** column.
    - `Protector-End branch` is mapped to the **Branch Wire** column ($+20/-0$ to $+50/-0\text{ mm}$).
-   - *Action*: Confirm with factory if any drawing-specific callouts override these column assignments.
+   - *Action*: Confirm with Motherson engineering if any drawing-specific callouts override these column assignments.
 2. **Negative-Side Guard Threshold**:
    - Set to $-80\%$ of clamp-to-clamp tolerance (e.g. deviation below $-4.0\text{ mm}$ on a $\pm 5.0\text{ mm}$ tolerance flags `REVIEW`).
    - *Action*: Confirm whether the factory requires strict rejection or review for values between $-4\text{ mm}$ and $-5\text{ mm}$.
@@ -220,8 +220,8 @@ The following assumptions have been made based on standard automotive harness en
    - BT45-02 specifies $S \le 22\text{s}$ and $A = 25-30\text{s}$. The $23-24\text{s}$ gap is treated as `REVIEW`.
    - *Action*: Confirm if $23-24\text{s}$ should be classified as Rank S or Rank A.
 4. **DSI Software Integration Interface**:
-   - DSI electrical continuity test integration is currently modeled via an extensible adapter schema (`OperatorInput.dsi_test_result`).
-   - *Action*: Confirm wire harness electrical testing file format (CSV, JSON, TCP socket, or REST webhook) once DSI specification is released.
-5. **Master Sample Validation Interval**:
-   - WI/PR/79 master sample verification is assumed valid for the active work shift (8 hours).
-   - *Action*: Confirm whether master sample check is shift-based, daily, or lot-based.
+   - DSI software specification is currently unspecified in available project documentation. Kept strictly as an extensible pluggable adapter stub (`OperatorInput.dsi_test_result`).
+   - *Action*: Confirm DSI software purpose, data exchange format (CSV, JSON, REST, socket), and protocol once engineering specifications are provided.
+5. **Master Sample Validation Interval (Unverified Assumption)**:
+   - *Unverified Assumption*: Master sample validation status per WI/PR/79 is assumed valid for the duration of the active 8-hour production shift.
+   - *Action*: Confirm whether master sample check frequency is shift-based (8 hours), daily (24 hours), or lot/batch-based.

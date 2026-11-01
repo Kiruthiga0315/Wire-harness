@@ -361,7 +361,7 @@ class GoldenReferenceService:
             "checkpoint_id", "type", "terminal_id", "node_id", "branch_id",
             "measurement_type", "expected_value", "unit", "tolerance",
             "reference_x", "reference_y", "roi_width", "roi_height",
-            "confidence", "status", "notes"
+            "confidence", "status", "notes", "source", "source_line", "placeholder"
         ]
         output = io.StringIO()
         writer = csv.DictWriter(output, fieldnames=fieldnames)
@@ -376,7 +376,7 @@ class GoldenReferenceService:
             "checkpoint_id", "type", "terminal_id", "node_id", "branch_id",
             "measurement_type", "expected_value", "unit", "tolerance",
             "reference_x", "reference_y", "roi_width", "roi_height",
-            "confidence", "status", "notes"
+            "confidence", "status", "notes", "source", "source_line", "placeholder"
         ]
         with open(self.csv_path, "w", newline="", encoding="utf-8") as f:
             writer = csv.DictWriter(f, fieldnames=fieldnames)

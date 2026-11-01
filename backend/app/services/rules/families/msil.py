@@ -67,7 +67,7 @@ def evaluate_msil_tolerances(
     guard_enabled = guard_cfg.get("enabled", True)
     guard_ratio = float(guard_cfg.get("threshold_ratio", 0.80))
 
-    if not calibrated or alignment_confidence < 0.85:
+    if not calibrated or alignment_confidence < 0.90:
         # All dimensional rules become NOT_EVALUATED
         for cp in checkpoints:
             cid = cp.get("checkpoint_id", "CP-UNKNOWN")
@@ -83,7 +83,7 @@ def evaluate_msil_tolerances(
                     mandatory=True,
                     expected=f"{exp} mm" if exp is not None else None,
                     actual=None,
-                    reason="Optical calibration unverified or blueprint alignment confidence below 0.85; rule not evaluated.",
+                    reason="Optical calibration unverified or blueprint alignment confidence below 0.90; rule not evaluated.",
                     reaction_plan=REACTION_PLAN,
                 )
             )
@@ -126,20 +126,26 @@ def evaluate_msil_tolerances(
         tol_display = f"+{tol_pos:.1f}/-{tol_neg:.1f} mm" if tol_neg != tol_pos else f"±{tol_pos:.1f} mm"
 
         if det is None:
+            if ref_status in ("NEEDS_CONFIRMATION", "REVIEW"):
+                status = "REVIEW"
+                reason = f"Checkpoint {cid} specification requires engineering confirmation: {cp.get('notes', '')}"
+            else:
+                status = "NOT_EVALUATED"
+                reason = f"Skeleton branch or physical distance for {cid} could not be resolved from workpiece image."
             results.append(
                 RuleResult(
                     rule_id=f"MSIL-TOL-{cid}",
                     family="msil_tolerances",
                     name=f"MSIL Dimensional Tolerance {cid}",
                     source_doc=rule_source,
-                    severity="CRITICAL" if ctype == "terminal" else "MAJOR",
-                    status="NOT_EVALUATED",
+                    severity="CRITICAL" if ctype in ("terminal", "node_distance") else "MAJOR",
+                    status=status,
                     mandatory=True,
                     expected=f"{exp:.1f} mm",
                     actual=None,
                     tolerance=tol_display,
                     deviation=None,
-                    reason=f"Skeleton branch or physical distance for {cid} could not be resolved from workpiece image.",
+                    reason=reason,
                     reaction_plan=REACTION_PLAN,
                 )
             )
@@ -173,7 +179,7 @@ def evaluate_msil_tolerances(
         calib_prov = context.vision.calibration_provenance or ""
         is_width_scaled = "width-scaled" in calib_prov
 
-        if ref_status == "NEEDS_CONFIRMATION":
+        if ref_status in ("NEEDS_CONFIRMATION", "REVIEW"):
             status = "REVIEW"
             reason = f"Measurement {det:.1f} mm requires engineering confirmation of reference specification: {cp.get('notes', '')}"
             reaction = REACTION_PLAN
