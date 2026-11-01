@@ -14,10 +14,12 @@ import { useNavigate } from 'react-router-dom'
 import { HarnessBoard } from '../components/HarnessBoard'
 import { PageHeader } from '../components/PageHeader'
 import { StatusPill } from '../components/StatusPill'
+import { RuleEngineVerdictPanel } from '../components/RuleEngineVerdictPanel'
 import { useInspection } from '../context/InspectionContext'
 import { API_BASE_URL, loadDemoImage, runMockInspection, runStickerInspection } from '../services/api'
 import type { InspectionState, MockCheckpointResult } from '../types/inspection'
 import type { StickerInspectionReport } from '../types/report'
+import type { HarnessVerdict, RuleResult } from '../types/rules'
 
 const MAX_UPLOAD_BYTES = 15 * 1024 * 1024
 const DEMO_MODEL_ID = 'DEMO-HARNESS-001'
@@ -59,6 +61,8 @@ export function LiveInspectionPage() {
 
   const [sticker, setSticker] = useState<StickerInspectionReport | null>(null)
   const [checkingSticker, setCheckingSticker] = useState(false)
+  const [ruleVerdict, setRuleVerdict] = useState<HarnessVerdict | null>(null)
+  const [selectedRule, setSelectedRule] = useState<RuleResult | null>(null)
 
   // Fetch sticker status whenever active image changes
   useEffect(() => {
@@ -354,6 +358,15 @@ export function LiveInspectionPage() {
 
           <div className="phase-notice"><strong>INSPECTION STATION</strong><span>Visual inspection results and automated sticker OCR verification.</span></div>
         </aside>
+      </section>
+
+      <section style={{ marginTop: '1.5rem' }}>
+        <RuleEngineVerdictPanel
+          verdict={ruleVerdict}
+          onVerdictChange={setRuleVerdict}
+          selectedRuleId={selectedRule?.rule_id}
+          onSelectRule={(r) => setSelectedRule(r)}
+        />
       </section>
     </>
   )

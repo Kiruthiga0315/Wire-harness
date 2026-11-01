@@ -16,11 +16,13 @@ import { ColorInspectionPanel } from '../components/ColorInspectionPanel'
 import { HarnessGraphPanel } from '../components/HarnessGraphPanel'
 import { WireColorIdentificationPanel } from '../components/WireColorIdentificationPanel'
 import { FeatureExtractionPanel } from '../components/FeatureExtractionPanel'
+import { RuleEngineVerdictPanel } from '../components/RuleEngineVerdictPanel'
 import { PageHeader } from '../components/PageHeader'
 import { StatusPill } from '../components/StatusPill'
 import { useInspection } from '../context/InspectionContext'
 import { ACTIVE_IMAGE_URL, loadDemoImage, runDemoSegmentation, syncCheckpointsFromGolden } from '../services/api'
 import type { SegmentationResponse } from '../types/engineering'
+import type { HarnessVerdict } from '../types/rules'
 
 const MAX_UPLOAD_BYTES = 15 * 1024 * 1024
 
@@ -40,6 +42,7 @@ export function EngineeringViewPage() {
   const [syncSuccessMessage, setSyncSuccessMessage] = useState<string | null>(null)
   const [editorRefreshTrigger, setEditorRefreshTrigger] = useState(0)
   const [colorRefreshTrigger, setColorRefreshTrigger] = useState(0)
+  const [ruleVerdict, setRuleVerdict] = useState<HarnessVerdict | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const processImage = useCallback(async (signal?: AbortSignal) => {
@@ -282,6 +285,13 @@ export function EngineeringViewPage() {
       <HarnessGraphPanel />
 
       <FeatureExtractionPanel />
+
+      <section style={{ marginTop: '2rem' }}>
+        <RuleEngineVerdictPanel
+          verdict={ruleVerdict}
+          onVerdictChange={setRuleVerdict}
+        />
+      </section>
 
       {result && <article className="panel method-panel"><p className="eyebrow">CURRENT METHOD</p><h2>OpenCV feasibility pipeline</h2><p>{result.method}.</p><div className="pipeline-steps"><span>1 · Grayscale</span><span>2 · Gaussian blur</span><span>3 · Inverted Otsu</span><span>4 · Morphological close</span><span>5 · Component cleanup</span><span>6 · Contours</span><span>7 · Skeletonize</span></div><small>{result.disclaimer}</small></article>}
     </>
