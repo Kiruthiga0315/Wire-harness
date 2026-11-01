@@ -170,6 +170,9 @@ def evaluate_msil_tolerances(
             )
         ]
 
+        calib_prov = context.vision.calibration_provenance or ""
+        is_width_scaled = "width-scaled" in calib_prov
+
         if ref_status == "NEEDS_CONFIRMATION":
             status = "REVIEW"
             reason = f"Measurement {det:.1f} mm requires engineering confirmation of reference specification: {cp.get('notes', '')}"
@@ -188,6 +191,14 @@ def evaluate_msil_tolerances(
                 f"Measurement {det:.1f} mm falls into negative-side guard region "
                 f"(deviation {dev:+.1f} mm < -{guard_ratio*100:.0f}% of tolerance {tol_display}). "
                 "Per WI/PR/79, process review is required."
+            )
+            reaction = REACTION_PLAN
+        elif is_width_scaled:
+            status = "REVIEW"
+            reason = (
+                f"Measurement {det:.1f} mm is within tolerance bounds ({dev:+.1f} mm), but calibration provenance "
+                "is 'width-scaled'. Width-scaled calibration produces REVIEW (never PASS) on dimensional rules; "
+                "in-situ yellow measuring tape or verified master calibration required for PASS disposition."
             )
             reaction = REACTION_PLAN
         else:

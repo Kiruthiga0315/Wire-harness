@@ -140,8 +140,7 @@ class RuleEngine:
         # 3. Execute Golden Inspection pipeline (segmentation, graph, calibration, checkpoints)
         inspection_out = golden_inspection_service.inspect_image(
             image,
-            target_variant=variant,
-            min_alignment=0.85,
+            override_pixels_per_mm=pixels_per_mm if calibrated else None,
         )
         align_conf = getattr(inspection_out, "alignment_confidence", 1.0)
         
