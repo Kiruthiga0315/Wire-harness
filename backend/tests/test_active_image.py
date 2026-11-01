@@ -35,6 +35,8 @@ def test_active_image_lifecycle() -> None:
             meta = meta_res.json()
             assert meta["source"] == "demo"
             assert meta["filename"] == "harness_sample_01.jpeg"
+            assert meta["width"] == 1800
+            assert meta["height"] == 560
 
             # Active image download
             active_res = await client.get("/api/test-images/active")
@@ -87,14 +89,7 @@ def test_active_image_lifecycle() -> None:
             # Verify reset back to demo in metadata
             meta_res3 = await client.get("/api/test-images/active/metadata")
             assert meta_res3.json()["source"] == "demo"
-
-            # Restore active workpiece 001_01_board_crop.png if available
-            board_crop_path = Path("images_001/001/001_01_board_crop.png")
-            if board_crop_path.exists():
-                with open(board_crop_path, "rb") as f:
-                    await client.post(
-                        "/api/test-images/active",
-                        files={"file": ("001_01_board_crop.png", f, "image/png")},
-                    )
+            assert meta_res3.json()["width"] == 1800
+            assert meta_res3.json()["height"] == 560
 
     asyncio.run(_run())
