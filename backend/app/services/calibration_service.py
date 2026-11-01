@@ -1,39 +1,15 @@
 """
 Calibration service for wire harness image measurements.
 
-Derives pixels-per-centimetre from a physical measuring tape visible
-in a reference image (Distance.jpeg).
-
-Physical measurement & ground truth
------------------------------------
-In Distance.jpeg (media_1793227830441_f62837e3.jpg, 459 × 1024 px), the yellow
-measuring tape is horizontally positioned across the top edge.
-On a standard metric measuring tape, prominent red numbers mark each decimeter
-(10 cm = 100 mm):
-  - Decimeter (10 cm) red markings appear at columns:
-    ~35, ~85, ~135, ~185, ~235, ~285, ~335, ~385, ~435 px.
-  - Spacing between consecutive 10 cm marks is consistently 50.0 pixels.
-  - Therefore:
-      50 pixels = 10 cm
-      5.0 pixels = 1 cm  (0.50 pixels / mm)
-
-Physical dimensions of the workbench inspection table:
-  - Width:  459 px ÷ 5.0 px/cm = 91.8 cm  (~3 ft / ~0.92 m)
-  - Height: 1024 px ÷ 5.0 px/cm = 204.8 cm (~6.7 ft / ~2.05 m)
-
-Proportional scaling for images with different resolutions:
-  px_per_cm_target = 5.0 × (target_width / 459.0)
-  px_per_mm_target = px_per_cm_target / 10.0
-
-Examples:
-  - Distance.jpeg (459 W):       5.000 px/cm (0.500 px/mm)
-  - WhatsApp active (564 W):     6.144 px/cm (0.614 px/mm)
-  - harness_sample_01 (681 W):   7.418 px/cm (0.742 px/mm)
+Single source of truth for all pixel-to-metric conversions with explicit
+provenance ('tape-detected' | 'manual' | 'width-scaled' | 'uncalibrated')
+and a calibrated flag.
 """
 
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass, field
 from typing import Any
 
 import cv2
@@ -54,6 +30,21 @@ _CALIB_PX_PER_CM: float = 5.0
 
 _CALIB_PX_PER_MM: float = _CALIB_PX_PER_CM / 10.0  # 0.50 px/mm
 
+MIN_ALIGNMENT_CONFIDENCE_THRESHOLD: float = 0.85
+
+
+@dataclass(frozen=True, slots=True)
+class CalibrationInfo:
+    calibrated: bool
+    pixels_per_mm: float
+    pixels_per_cm: float
+    provenance: str  # "tape-detected" | "manual" | "width-scaled" | "uncalibrated"
+    tape_pixel_span: float | None = None
+    tape_cm_span: float | None = None
+    tape_row_center: int | None = None
+    alignment_confidence: float = 1.0
+    details: dict[str, Any] = field(default_factory=dict)
+
 
 def pixels_per_cm_for_width(image_width_px: int) -> float:
     """Return pixels per centimetre scaled for *image_width_px*.
@@ -68,6 +59,8 @@ def pixels_per_cm_for_width(image_width_px: int) -> float:
     float:
         Pixels per centimetre.
     """
+    if image_width_px <= 0:
+        return 0.0
     scale = float(image_width_px) / float(_CALIB_IMAGE_WIDTH_PX)
     return round(_CALIB_PX_PER_CM * scale, 4)
 
@@ -84,58 +77,80 @@ def detect_tape_calibration(
     tape_row_search_bottom: float = 0.08,
 ) -> dict[str, Any]:
     """Detect yellow measuring tape in *image* and return calibration metrics.
-
-    Parameters
-    ----------
-    image:
-        BGR image array.
-    tape_row_search_top, tape_row_search_bottom:
-        Fractional row range to look for the tape strip.
-
-    Returns
-    -------
-    dict with pixels_per_cm, pixels_per_mm, method, and diagnostics.
+    
+    Validates genuine continuous yellow tape span (>= 40% width and >= 2% density).
+    When verified tape is detected, extracts periodic decimeter rhythm from tape
+    contrast profile to derive actual optical scale.
     """
     if image is None or image.ndim != 3:
         return _fallback_calibration(image, reason="invalid_image")
 
     h, w = image.shape[:2]
     row_top = int(h * tape_row_search_top)
-    row_bot = int(h * tape_row_search_bottom)
+    row_bot = max(int(h * tape_row_search_bottom), 20)
 
-    hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-    tape_hsv = hsv[row_top:row_bot, :, :]
+    hsv = cv2.cvtColor(image[row_top:row_bot, :, :], cv2.COLOR_BGR2HSV)
 
     # Yellow mask
     yellow_mask = cv2.inRange(
-        tape_hsv,
+        hsv,
         np.array([15, 70, 70], dtype=np.uint8),
         np.array([40, 255, 255], dtype=np.uint8),
     )
 
-    if not np.any(yellow_mask):
+    total_yellow = int(np.count_nonzero(yellow_mask))
+    band_area = (row_bot - row_top) * w
+
+    if total_yellow == 0:
         return _fallback_calibration(image, reason="no_yellow_tape")
 
-    # Densest yellow row
+    cols_with_yellow = np.where(np.any(yellow_mask, axis=0))[0]
+    tape_px_span = float(cols_with_yellow[-1] - cols_with_yellow[0]) if len(cols_with_yellow) > 0 else 0.0
+    span_ratio = tape_px_span / float(w) if w > 0 else 0.0
+    density = float(total_yellow) / float(band_area) if band_area > 0 else 0.0
+
+    # Genuine physical tape must span across at least 40% of the board with sufficient density
+    if span_ratio < 0.40 or density < 0.02:
+        return _fallback_calibration(image, reason="insufficient_tape_span")
+
+    # Densest yellow row (tape centerline)
     row_sums = np.sum(yellow_mask, axis=1)
     tape_center_row = int(np.argmax(row_sums)) + row_top
 
-    # Measure tape decimeter rhythm if clear, or apply proportional formula
-    px_cm = pixels_per_cm_for_width(w)
-    px_mm = pixels_per_mm_for_width(w)
+    # Extract decimeter peak intervals from centerline grayscale profile
+    try:
+        import scipy.signal
 
-    cols_with_yellow = np.where(np.any(yellow_mask, axis=0))[0]
-    tape_px_span = float(cols_with_yellow[-1] - cols_with_yellow[0]) if len(cols_with_yellow) > 0 else float(w)
-    tape_cm_span = round(tape_px_span / px_cm, 1)
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        r_start = max(0, tape_center_row - 3)
+        r_end = min(h, tape_center_row + 4)
+        band = gray[r_start:r_end, :]
+        inv_signal = 255.0 - np.min(band, axis=0).astype(float)
 
-    return {
-        "pixels_per_mm": px_mm,
-        "pixels_per_cm": px_cm,
-        "method": "tape_detected",
-        "tape_pixel_span": tape_px_span,
-        "tape_cm_span": tape_cm_span,
-        "tape_row_center": tape_center_row,
-    }
+        expected_decimeter_px = _CALIB_PX_PER_CM * 10.0 * (float(w) / float(_CALIB_IMAGE_WIDTH_PX))
+        min_dist = max(20, int(expected_decimeter_px * 0.6))
+        peaks, _ = scipy.signal.find_peaks(inv_signal, prominence=14, distance=min_dist)
+
+        if len(peaks) >= 3:
+            diffs = np.diff(peaks)
+            med_diff = float(np.median(diffs))
+            # Validate median diff matches reasonable optical decimeter bounds
+            if 0.5 * expected_decimeter_px <= med_diff <= 1.5 * expected_decimeter_px:
+                px_cm = round(med_diff / 10.0, 4)
+                px_mm = round(px_cm / 10.0, 5)
+                tape_cm_span = round(tape_px_span / px_cm, 1) if px_cm > 0 else 0.0
+                return {
+                    "pixels_per_mm": px_mm,
+                    "pixels_per_cm": px_cm,
+                    "method": "tape-detected",
+                    "tape_pixel_span": tape_px_span,
+                    "tape_cm_span": tape_cm_span,
+                    "tape_row_center": tape_center_row,
+                }
+    except Exception as exc:
+        logger.warning("Decimeter peak extraction exception: %s", exc)
+
+    return _fallback_calibration(image, reason="tape_peaks_unresolved")
 
 
 def _fallback_calibration(
@@ -149,8 +164,102 @@ def _fallback_calibration(
     return {
         "pixels_per_mm": px_mm,
         "pixels_per_cm": px_cm,
-        "method": f"proportional_fallback:{reason}",
+        "method": f"width-scaled:{reason}",
         "tape_pixel_span": None,
         "tape_cm_span": None,
         "tape_row_center": None,
     }
+
+
+def resolve_calibration(
+    image: NDArray[np.uint8] | None = None,
+    *,
+    override_pixels_per_mm: float | None = None,
+    config: dict[str, Any] | None = None,
+    alignment_confidence: float = 1.0,
+    min_alignment_confidence: float = MIN_ALIGNMENT_CONFIDENCE_THRESHOLD,
+) -> CalibrationInfo:
+    """Resolve single source-of-truth calibration info with explicit provenance.
+
+    If alignment_confidence is below min_alignment_confidence, or if no valid
+    scale can be derived, returns calibrated=False with provenance='uncalibrated'.
+    """
+    if alignment_confidence < min_alignment_confidence:
+        logger.warning(
+            "Alignment confidence %.3f is below required threshold %.3f; calibration gate failed",
+            alignment_confidence,
+            min_alignment_confidence,
+        )
+        return CalibrationInfo(
+            calibrated=False,
+            pixels_per_mm=0.0,
+            pixels_per_cm=0.0,
+            provenance="uncalibrated",
+            alignment_confidence=alignment_confidence,
+            details={"gate_failed": "alignment_confidence_too_low", "alignment_confidence": alignment_confidence},
+        )
+
+    # 1. Manual override
+    if override_pixels_per_mm is not None and override_pixels_per_mm > 0:
+        ppm = float(override_pixels_per_mm)
+        return CalibrationInfo(
+            calibrated=True,
+            pixels_per_mm=round(ppm, 5),
+            pixels_per_cm=round(ppm * 10.0, 4),
+            provenance="manual",
+            alignment_confidence=alignment_confidence,
+            details={"source": "manual_override"},
+        )
+
+    # 2. In-situ Tape detection from image
+    if image is not None and hasattr(image, "shape") and image.ndim == 3:
+        tape_res = detect_tape_calibration(image)
+        if tape_res.get("method") == "tape-detected":
+            ppm = float(tape_res["pixels_per_mm"])
+            return CalibrationInfo(
+                calibrated=True,
+                pixels_per_mm=round(ppm, 5),
+                pixels_per_cm=round(float(tape_res["pixels_per_cm"]), 4),
+                provenance="tape-detected",
+                tape_pixel_span=tape_res.get("tape_pixel_span"),
+                tape_cm_span=tape_res.get("tape_cm_span"),
+                tape_row_center=tape_res.get("tape_row_center"),
+                alignment_confidence=alignment_confidence,
+                details=tape_res,
+            )
+
+        # 3. Proportional width-scaled from table geometry
+        w = int(image.shape[1])
+        if w > 0:
+            ppm = pixels_per_mm_for_width(w)
+            return CalibrationInfo(
+                calibrated=True,
+                pixels_per_mm=ppm,
+                pixels_per_cm=pixels_per_cm_for_width(w),
+                provenance="width-scaled",
+                alignment_confidence=alignment_confidence,
+                details={"reason": tape_res.get("method", "width_scaled"), "image_width": w},
+            )
+
+    # 4. Config fallback if specified
+    if config:
+        calib_cfg = config.get("calibration", {})
+        if calib_cfg.get("calibrated", False) and calib_cfg.get("pixels_per_mm", 0) > 0:
+            ppm = float(calib_cfg["pixels_per_mm"])
+            return CalibrationInfo(
+                calibrated=True,
+                pixels_per_mm=round(ppm, 5),
+                pixels_per_cm=round(ppm * 10.0, 4),
+                provenance=calib_cfg.get("method", "manual"),
+                alignment_confidence=alignment_confidence,
+                details=calib_cfg,
+            )
+
+    return CalibrationInfo(
+        calibrated=False,
+        pixels_per_mm=0.0,
+        pixels_per_cm=0.0,
+        provenance="uncalibrated",
+        alignment_confidence=alignment_confidence,
+        details={"reason": "no_calibration_source_available"},
+    )

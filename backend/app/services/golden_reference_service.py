@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import csv
 import io
 import json
@@ -74,6 +75,22 @@ class GoldenReferenceService:
             logger.error(f"Error loading golden config: {exc}")
             return self._default_configuration()
 
+    def get_confirmed_configuration(self) -> dict[str, Any]:
+        """Load and return configuration containing only drawing-confirmed checkpoints."""
+        config = copy.deepcopy(self.get_configuration())
+        confirmed_cps = [cp for cp in config.get("checkpoints", []) if cp.get("status") == "CONFIRMED"]
+        config["checkpoints"] = confirmed_cps
+        config["specification_summary"] = {
+            "total_checkpoints": len(confirmed_cps),
+            "total_terminals": sum(1 for c in confirmed_cps if c.get("type") == "terminal"),
+            "total_nodes": sum(1 for c in confirmed_cps if c.get("type") == "node_distance"),
+            "confirmed_count": len(confirmed_cps),
+            "unconfirmed_count": 0,
+            "unit": "mm",
+            "source_unit": "cm",
+        }
+        return config
+
     def save_configuration(self, config: dict[str, Any]) -> dict[str, Any]:
         """Save configuration to both JSON and CSV files."""
         # Recalculate summary
@@ -111,6 +128,13 @@ class GoldenReferenceService:
         for cp in checkpoints:
             if cp.get("checkpoint_id") == checkpoint_id:
                 for key, val in updates.items():
+                    if key == "expected_value":
+                        # Blueprint drawing intent: Cannot be modified from automated CV or unverified updates
+                        if updates.get("source") != "drawing" and not updates.get("force_drawing_override"):
+                            logger.warning(
+                                f"Rejected automated modification of drawing expected_value for {checkpoint_id}."
+                            )
+                            continue
                     if key in cp:
                         cp[key] = val
                 target_cp = cp
@@ -270,7 +294,13 @@ class GoldenReferenceService:
             cp_copy["reference_y"] = ref_y
             cp_copy["roi_width"] = max(35, min(80, int(round(gcp.get("roi_width", 45) * scale_roi))))
             cp_copy["roi_height"] = max(35, min(80, int(round(gcp.get("roi_height", 45) * scale_roi))))
-            cp_copy["status"] = "CONFIRMED"
+            # Never overwrite blueprint drawing status or expected_value during active workpiece sync
+            cp_copy["status"] = gcp.get("status", "NEEDS_CONFIRMATION")
+            cp_copy["placeholder"] = gcp.get("placeholder", True)
+            cp_copy["source"] = gcp.get("source", "placeholder")
+            cp_copy["source_line"] = gcp.get("source_line")
+            cp_copy["expected_value"] = gcp.get("expected_value")
+            cp_copy["baseline_mm"] = gcp.get("baseline_mm")
             scaled_checkpoints.append(cp_copy)
 
         # 5. Calibration for the new workpiece
@@ -361,7 +391,7 @@ class GoldenReferenceService:
             "checkpoint_id", "type", "terminal_id", "node_id", "branch_id",
             "measurement_type", "expected_value", "unit", "tolerance",
             "reference_x", "reference_y", "roi_width", "roi_height",
-            "confidence", "status", "notes"
+            "confidence", "status", "notes", "source", "source_line", "placeholder"
         ]
         output = io.StringIO()
         writer = csv.DictWriter(output, fieldnames=fieldnames)
@@ -376,7 +406,7 @@ class GoldenReferenceService:
             "checkpoint_id", "type", "terminal_id", "node_id", "branch_id",
             "measurement_type", "expected_value", "unit", "tolerance",
             "reference_x", "reference_y", "roi_width", "roi_height",
-            "confidence", "status", "notes"
+            "confidence", "status", "notes", "source", "source_line", "placeholder"
         ]
         with open(self.csv_path, "w", newline="", encoding="utf-8") as f:
             writer = csv.DictWriter(f, fieldnames=fieldnames)

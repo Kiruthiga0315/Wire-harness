@@ -805,5 +805,191 @@ class PdfReportService:
         doc.build(story)
         return buffer.getvalue()
 
+    def generate_verdict_pdf(self, verdict_data: Any) -> bytes:
+        """Generates a dedicated Final Quality Disposition & Reaction Plan PDF certificate."""
+        if not REPORTLAB_AVAILABLE:
+            raise RuntimeError("PDF generation requires 'reportlab'.")
+
+        v_dict = verdict_data.model_dump() if hasattr(verdict_data, "model_dump") else verdict_data
+
+        verdict_str = str(v_dict.get("verdict", "HOLD")).upper()
+        verdict_id = v_dict.get("verdict_id", "N/A")
+        timestamp = v_dict.get("timestamp", "N/A")
+        variant = v_dict.get("variant", "YH200502")
+        part_no = v_dict.get("part_no", "YH200502")
+        rule_pack_version = v_dict.get("rule_pack_version", "1.0.0")
+        calib_prov = v_dict.get("calibration_provenance", "uncalibrated")
+        image_hash = (v_dict.get("image_hash", "") or "N/A")[:16] + "..." if v_dict.get("image_hash") else "N/A"
+        reaction_plan = v_dict.get("reaction_plan", "")
+        summary = v_dict.get("summary", {})
+        rule_results = v_dict.get("rule_results", [])
+
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=A4,
+            leftMargin=36,
+            rightMargin=36,
+            topMargin=36,
+            bottomMargin=36,
+        )
+
+        styles = getSampleStyleSheet()
+        normal = styles["Normal"]
+
+        story = []
+
+        # 1. Header
+        header_table = Table(
+            [
+                [
+                    Paragraph("<b>MSIL WIRE HARNESS INSPECTION SYSTEM</b>", ParagraphStyle("H1", fontName="Helvetica-Bold", fontSize=13, leading=16, textColor=colors.HexColor("#0b2947"))),
+                    Paragraph(f"<b>Certificate ID:</b> {verdict_id[:8]}", ParagraphStyle("HR1", fontName="Helvetica-Bold", fontSize=9, leading=12, alignment=2)),
+                ],
+                [
+                    Paragraph("Final Quality Disposition & Reaction Plan Certificate (WI/PR/79 & FRM/PR/19)", ParagraphStyle("H2", fontName="Helvetica", fontSize=8, leading=11, textColor=colors.HexColor("#64748b"))),
+                    Paragraph(f"<b>Timestamp:</b> {timestamp}", ParagraphStyle("HR2", fontName="Helvetica", fontSize=8, leading=11, alignment=2, textColor=colors.HexColor("#64748b"))),
+                ],
+            ],
+            colWidths=[340, 183],
+        )
+        story.append(header_table)
+        story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor("#0284c7"), spaceBefore=4, spaceAfter=8))
+
+        # 2. Large Disposition Banner
+        if verdict_str == "ACCEPT":
+            bg_color = colors.HexColor("#15803d")
+            banner_text = "FINAL DISPOSITION: ACCEPT (CONFORMING WORKPIECE)"
+            sub_text = "All mandatory quality rules satisfied. Workpiece released for packing."
+        elif verdict_str == "REJECT":
+            bg_color = colors.HexColor("#b91c1c")
+            banner_text = "FINAL DISPOSITION: REJECT (NON-CONFORMING WORKPIECE)"
+            sub_text = "Critical or major non-conformity detected. Workpiece segregated."
+        else:
+            bg_color = colors.HexColor("#d97706")
+            banner_text = "FINAL DISPOSITION: HOLD (PENDING VERIFICATION)"
+            sub_text = "Mandatory inspection item held, uncalibrated, or awaiting operator attestation."
+
+        banner_p = Paragraph(
+            f"<font color='white'><b>{banner_text}</b><br/><font size='8'>{sub_text}</font></font>",
+            ParagraphStyle("Banner", fontName="Helvetica-Bold", fontSize=11, leading=15, alignment=1),
+        )
+        banner_table = Table([[banner_p]], colWidths=[523])
+        banner_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), bg_color),
+            ("BOX", (0, 0), (-1, -1), 1.5, bg_color),
+            ("TOPPADDING", (0, 0), (-1, -1), 8),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+        ]))
+        story.append(banner_table)
+        story.append(Spacer(1, 8))
+
+        # 3. Workpiece & Inspection Metadata
+        meta_data = [
+            [
+                Paragraph("<b>Customer:</b> MSIL", normal),
+                Paragraph(f"<b>Part Number:</b> {part_no}", normal),
+                Paragraph(f"<b>Harness Variant:</b> {variant}", normal),
+            ],
+            [
+                Paragraph(f"<b>Rule Pack:</b> v{rule_pack_version}", normal),
+                Paragraph(f"<b>Calibration Provenance:</b> {calib_prov}", normal),
+                Paragraph(f"<b>Image Hash:</b> {image_hash}", normal),
+            ],
+            [
+                Paragraph(f"<b>Total Rules:</b> {summary.get('TOTAL', len(rule_results))}", normal),
+                Paragraph(f"<b>Passed:</b> {summary.get('PASS', 0)}", normal),
+                Paragraph(
+                    f"<b>Failed:</b> {summary.get('FAIL', 0)} (Crit: {summary.get('CRITICAL_FAIL', 0)}, Maj: {summary.get('MAJOR_FAIL', 0)})",
+                    normal,
+                ),
+            ],
+        ]
+        meta_table = Table(meta_data, colWidths=[174, 174, 175])
+        meta_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f8fafc")),
+            ("BOX", (0, 0), (-1, -1), 1, colors.HexColor("#e2e8f0")),
+            ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#e2e8f0")),
+            ("LEFTPADDING", (0, 0), (-1, -1), 6),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ]))
+        story.append(meta_table)
+        story.append(Spacer(1, 8))
+
+        # 4. Reaction Plan Alert Box
+        if reaction_plan:
+            rx_p = Paragraph(
+                f"<b>FACTORY REACTION PLAN ON REJECT / HOLD:</b><br/>"
+                f"<font size='8' color='#991b1b'>{reaction_plan}</font>",
+                ParagraphStyle("Rx", fontName="Helvetica", fontSize=8, leading=12),
+            )
+            rx_table = Table([[rx_p]], colWidths=[523])
+            rx_table.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#fef2f2")),
+                ("BOX", (0, 0), (-1, -1), 1, colors.HexColor("#fca5a5")),
+                ("LEFTPADDING", (0, 0), (-1, -1), 8),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+                ("TOPPADDING", (0, 0), (-1, -1), 6),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ]))
+            story.append(rx_table)
+            story.append(Spacer(1, 8))
+
+        # 5. Non-conforming and Held Rules Table
+        non_pass_rules = [r for r in rule_results if r.get("status") in ("FAIL", "REVIEW", "NOT_EVALUATED")]
+        story.append(Paragraph(f"<b>NON-CONFORMING & HELD RULES ({len(non_pass_rules)} ITEMS)</b>", ParagraphStyle("Sec", fontName="Helvetica-Bold", fontSize=9, leading=12, textColor=colors.HexColor("#0b2947"))))
+        story.append(Spacer(1, 4))
+
+        if non_pass_rules:
+            rule_rows = [
+                [
+                    Paragraph("<b>Rule ID</b>", normal),
+                    Paragraph("<b>Family</b>", normal),
+                    Paragraph("<b>Severity</b>", normal),
+                    Paragraph("<b>Status</b>", normal),
+                    Paragraph("<b>Reason / Failure Details</b>", normal),
+                ]
+            ]
+            for r in non_pass_rules[:20]:  # Limit top 20 to fit neatly
+                st = r.get("status", "")
+                sev = r.get("severity", "")
+                st_color = "#dc2626" if st == "FAIL" else "#d97706"
+                rule_rows.append([
+                    Paragraph(f"<b>{r.get('rule_id', '')}</b>", normal),
+                    Paragraph(r.get("family", "")[:15], normal),
+                    Paragraph(sev, normal),
+                    Paragraph(f"<font color='{st_color}'><b>{st}</b></font>", normal),
+                    Paragraph(r.get("reason", "")[:120], normal),
+                ])
+            rt_table = Table(rule_rows, colWidths=[90, 85, 55, 55, 238])
+            rt_table.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#f1f5f9")),
+                ("BOX", (0, 0), (-1, -1), 1, colors.HexColor("#cbd5e1")),
+                ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#e2e8f0")),
+                ("LEFTPADDING", (0, 0), (-1, -1), 4),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+                ("TOPPADDING", (0, 0), (-1, -1), 3),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+            ]))
+            story.append(rt_table)
+        else:
+            story.append(Paragraph("<font color='#16a34a'><b>✔ Zero non-conformances. All evaluated rules conform to MSIL standards.</b></font>", normal))
+
+        # Sign-off block
+        story.append(Spacer(1, 16))
+        sig_data = [
+            [
+                Paragraph("<b>Line Inspector Signature:</b> ____________________", normal),
+                Paragraph("<b>QA Supervisor Sign-Off:</b> ____________________", normal),
+            ]
+        ]
+        sig_table = Table(sig_data, colWidths=[261, 262])
+        story.append(sig_table)
+
+        doc.build(story)
+        return buffer.getvalue()
+
 
 pdf_report_service = PdfReportService()

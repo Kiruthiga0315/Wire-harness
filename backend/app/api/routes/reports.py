@@ -359,3 +359,58 @@ def export_demo_report_pdf(db: Session = Depends(get_db)) -> Response:
         media_type="application/pdf",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+@router.get("/verdict/{verdict_id}.pdf", summary="Export a specific Rule Verdict Certificate as PDF")
+def export_verdict_pdf(verdict_id: str, db: Session = Depends(get_db)) -> Response:
+    from app.api.routes.rules import get_verdict_by_id
+    v_data = get_verdict_by_id(verdict_id, db)
+    pdf_bytes = pdf_report_service.generate_verdict_pdf(v_data)
+    filename = f"verdict_{verdict_id}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/verdict/{verdict_id}.csv", summary="Export a specific Rule Verdict Certificate as CSV")
+def export_verdict_csv(verdict_id: str, db: Session = Depends(get_db)) -> Response:
+    from app.api.routes.rules import get_verdict_by_id
+    v_data = get_verdict_by_id(verdict_id, db)
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["RECORD_TYPE", "VERDICT_ID", "VERDICT", "VARIANT", "PART_NO", "RULE_PACK_VERSION", "CALIB_PROV", "REACTION_PLAN"])
+    writer.writerow([
+        "FINAL_DISPOSITION",
+        v_data.get("verdict_id"),
+        v_data.get("verdict"),
+        v_data.get("variant"),
+        v_data.get("part_no"),
+        v_data.get("rule_pack_version"),
+        v_data.get("calibration_provenance"),
+        v_data.get("reaction_plan"),
+    ])
+
+    writer.writerow([])
+    writer.writerow(["RECORD_TYPE", "RULE_ID", "FAMILY", "SEVERITY", "STATUS", "MANDATORY", "EXPECTED", "ACTUAL", "REASON"])
+    for r in v_data.get("rule_results", []):
+        writer.writerow([
+            "RULE_RESULT",
+            r.get("rule_id"),
+            r.get("family"),
+            r.get("severity"),
+            r.get("status"),
+            r.get("mandatory"),
+            r.get("expected"),
+            r.get("actual"),
+            r.get("reason"),
+        ])
+
+    filename = f"verdict_{verdict_id}.csv"
+    return Response(
+        content=output.getvalue().encode("utf-8-sig"),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

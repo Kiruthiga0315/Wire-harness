@@ -17,6 +17,48 @@ python run.py
 .\run.cmd
 ```
 
+## Deterministic Rule-Based Inspection Engine (Customer: MSIL, Part: YH200502)
+
+The system includes a zero-ML, deterministic, fully explainable rule-based ACCEPT / REJECT / HOLD engine implementing official plant quality standards:
+
+### Rule Families & Packs (`data/rules/*.yaml`):
+1. **MSIL Dimensional Tolerance Chart (`msil_tolerances.yaml`)**:
+   - Nominal dimension classes ($\le 200$, $201-500$, $501-2000$, $2001-5000$, $>5000\text{ mm}$).
+   - Asymmetric tolerances for branch wire and single wire ($+tol / -0\text{ mm}$).
+   - Negative-side guard: Clamp-to-clamp deviations below $-80\%$ of tolerance trigger `REVIEW` (process drift warning).
+   - Drawing-specific overrides for part `YH200502`.
+2. **Branch Taping Standard (`taping_standard.yaml`, BT45-02)**:
+   - Lap limits per branch type (W: 26-30, X: 28-30, T/Y/V: 19-22; outside range $\implies$ `FAIL`).
+   - Cross-taping prohibited on all branches except Type X.
+   - Cycle time ranks ($S \le 22\text{s}$, $A: 25-30\text{s}$, $B: 31-35\text{s}$, $C: 36-40\text{s}$, $D \ge 41\text{s}$). $23-24\text{s}$ transition gap triggers `REVIEW`.
+3. **Visual Inspection Standard (`visual_inspection_wi79.yaml`, WI/PR/79 rev 08 Process 19)**:
+   - 14 rules including master sample status, barcode part label, connector color tape match, dummy seals, TBO check, clamp count/positions, and zero missing components.
+4. **Final Assembly Check Sheet (`final_assembly_frm19.yaml`, FRM/PR/19 rev 10)**:
+   - Structured operator sheet with 9 checks $\times 2$ pieces (first piece and last piece).
+   - Any `NG` $\implies$ `FAIL` (REJECT); any `CORRECTED` $\implies$ `REVIEW` with note.
+   - Part number matching and barcode serial reconciliation.
+5. **Past Trouble Database (`ptdb_yh200502.yaml`, 23 MSIL Concerns)**:
+   - Historical concerns from Oct'25 to Mar'26 (coupler branch lengths, clamp distance/direction, grommets, routing, crimping).
+   - Concerns with repeat count $\ge 2$, highlighted, or vehicle-reported are weighted as `CRITICAL`.
+6. **Engineering Pre-Gates (`gates.py`)**:
+   - Image quality (sharpness, brightness, clipping), optical scale calibration provenance, blueprint alignment ($\ge 0.85$), and segmentation sanity. Failures result in `HOLD` with "re-capture" reason.
+
+### Final Disposition Protocol:
+- **`REJECT`**: Any `CRITICAL` or `MAJOR` rule fails, or any zero-tolerance failure.
+- **`HOLD`**: Any mandatory rule is `REVIEW` or `NOT_EVALUATED`, or pre-gate fails.
+- **`ACCEPT`**: ONLY when ALL mandatory quality rules evaluate to `PASS`. Zero default acceptance.
+- **Factory Reaction Plan on REJECT or HOLD**:
+  > *"Pink tag + Red tape, segregate, inform supervisor/line leader; no rework at visual-inspection stage; record NG details."*
+
+### Key Rule Engine Endpoints:
+- `POST /api/rules/evaluate`: Evaluate image with optional operator input JSON.
+- `GET /api/rules/pack`: Retrieve loaded rule pack definitions.
+- `GET /api/rules/verdicts/{id}`: Fetch historical verdict record from DB and JSON snapshot.
+- `GET /api/reports/verdict/{id}.pdf`: Export full Quality Disposition Certificate as PDF.
+- `GET /api/reports/verdict/{id}.csv`: Export full disposition report as CSV.
+
+---
+
 ## Phase 1 status
 
 Included:

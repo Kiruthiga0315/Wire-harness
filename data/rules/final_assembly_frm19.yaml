@@ -1,0 +1,56 @@
+version: "1.0.0"
+pack_id: "final_assembly_frm19"
+name: "Final Assembly Inspection Check Sheet"
+source_doc: "FRM/PR/19 rev 10"
+
+check_items:
+  - id: "FRM19-01-LENGTH"
+    name: "Length as per drawing"
+    severity: "CRITICAL"
+    mandatory: true
+  - id: "FRM19-02-PART-ATTACH"
+    name: "Correct part attachment"
+    severity: "CRITICAL"
+    mandatory: true
+  - id: "FRM19-03-NO-CKT-WRONG"
+    name: "No circuit wrong"
+    severity: "CRITICAL"
+    mandatory: true
+  - id: "FRM19-04-COLOUR-VTB"
+    name: "Correct colour VTB"
+    severity: "MAJOR"
+    mandatory: true
+  - id: "FRM19-05-VTB-PUNCHING"
+    name: "VTB punching as per drawing"
+    severity: "MAJOR"
+    mandatory: true
+  - id: "FRM19-06-NO-EXCESS-TAPE"
+    name: "No excess taping"
+    severity: "MAJOR"
+    mandatory: true
+  - id: "FRM19-07-LABEL-ATTACH"
+    name: "Correct label attachment"
+    severity: "MAJOR"
+    mandatory: true
+  - id: "FRM19-08-NO-LOOSE-TAPE"
+    name: "No loose taping"
+    severity: "MAJOR"
+    mandatory: true
+  - id: "FRM19-09-NO-WRONG-TERM"
+    name: "No wrong terminal"
+    severity: "CRITICAL"
+    mandatory: true
+
+rules:
+  piece_evaluations: ["first_piece", "last_piece"]
+  allowed_states: ["OK", "NG", "CORRECTED"]
+  ng_action: "REJECT"
+  corrected_action: "REVIEW"
+  part_matching:
+    match_sheet_to_sticker: true
+    match_sheet_to_variant: true
+    mismatch_action: "REJECT"
+  serial_reconciliation:
+    formula: "(serial_to - serial_from + 1) - serial_scrapped == total_production_qty"
+    severity: "MINOR"
+    mismatch_action: "REVIEW"
