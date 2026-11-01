@@ -25,7 +25,6 @@ const navigation = [
   { label: 'Dashboard', path: '/', icon: Gauge },
   { label: 'Live Inspection', path: '/live', icon: ScanLine },
   { label: 'Golden Reference', path: '/checkpoints', icon: ClipboardCheck },
-  { label: 'Golden Inspection', path: '/measurements', icon: Ruler },
   { label: 'Engineering View', path: '/engineering', icon: FlaskConical },
   { label: 'Models / Recipes', path: '/models', icon: Boxes },
   { label: 'Cameras', path: '/cameras', icon: Camera },
