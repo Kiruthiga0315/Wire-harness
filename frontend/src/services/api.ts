@@ -5,7 +5,8 @@ import type { MockInspectionResponse } from '../types/inspection'
 import type { ColorInspectionResponse } from '../types/colorInspection'
 import type { InspectionReportResponse, StickerInspectionReport } from '../types/report'
 import type { WireColorIdentificationResponse } from '../types/wireColor'
-import type { FeatureExtractionResponse } from '../types/featureExtraction' 
+import type { FeatureExtractionResponse } from '../types/featureExtraction'
+import type { HarnessVerdict, RuleEvaluationRequest } from '../types/rules' 
 
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
 const DEMO_IMAGE_PATH = '/api/test-images/harness_sample_01.jpeg'
@@ -595,5 +596,98 @@ export async function runFeatureExtraction(config?: Record<string, unknown>): Pr
   } catch (error) {
     if (error instanceof ApiError) throw error
     throw new ApiError('Failed to execute feature extraction pipeline.')
+  }
+}
+
+export async function evaluateRules(request: RuleEvaluationRequest): Promise<HarnessVerdict> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/rules/evaluate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(request),
+    })
+    if (!response.ok) {
+      let detail = 'Rule evaluation failed.'
+      try {
+        const err = (await response.json()) as { detail?: string }
+        if (err.detail) detail = err.detail
+      } catch {
+        // Fallback
+      }
+      throw new ApiError(detail, response.status)
+    }
+    return (await response.json()) as HarnessVerdict
+  } catch (error) {
+    if (error instanceof ApiError) throw error
+    throw new ApiError('Failed to execute rule engine.')
+  }
+}
+
+export async function getRuleVerdict(verdictId: string): Promise<HarnessVerdict> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/rules/verdicts/${verdictId}`, { cache: 'no-store' })
+    if (!response.ok) {
+      throw new ApiError('Verdict not found.', response.status)
+    }
+    return (await response.json()) as HarnessVerdict
+  } catch (error) {
+    if (error instanceof ApiError) throw error
+    throw new ApiError('Failed to retrieve rule verdict.')
+  }
+}
+
+export async function getRulePacks(packId?: string): Promise<Record<string, unknown>> {
+  try {
+    const url = packId ? `${API_BASE_URL}/api/rules/pack?pack_id=${packId}` : `${API_BASE_URL}/api/rules/pack`
+    const response = await fetch(url)
+    if (!response.ok) {
+      throw new ApiError('Failed to load rule packs.', response.status)
+    }
+    return (await response.json()) as Record<string, unknown>
+  } catch (error) {
+    if (error instanceof ApiError) throw error
+    throw new ApiError('Failed to fetch rule packs.')
+  }
+}
+
+export async function downloadVerdictPdf(verdictId: string): Promise<void> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/reports/verdict/${verdictId}.pdf`, { cache: 'no-store' })
+    if (!response.ok) {
+      throw new ApiError('PDF report could not be generated.', response.status)
+    }
+    const blob = await response.blob()
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `verdict_${verdictId}.pdf`
+    document.body.appendChild(anchor)
+    anchor.click()
+    anchor.remove()
+    URL.revokeObjectURL(url)
+  } catch (error) {
+    if (error instanceof ApiError) throw error
+    throw new ApiError('Unable to download Verdict PDF certificate.')
+  }
+}
+
+export async function downloadVerdictCsv(verdictId: string): Promise<void> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/reports/verdict/${verdictId}.csv`, { cache: 'no-store' })
+    if (!response.ok) {
+      throw new ApiError('CSV report could not be generated.', response.status)
+    }
+    const blob = await response.blob()
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `verdict_${verdictId}.csv`
+    document.body.appendChild(anchor)
+    anchor.click()
+    anchor.remove()
+    URL.revokeObjectURL(url)
+  } catch (error) {
+    if (error instanceof ApiError) throw error
+    throw new ApiError('Unable to download Verdict CSV.')
   }
 }
