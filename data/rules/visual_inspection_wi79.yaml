@@ -1,0 +1,103 @@
+version: "1.0.0"
+pack_id: "visual_inspection_wi79"
+name: "Visual Inspection Process Standard"
+source_doc: "WI/PR/79 rev 08 (Process 19)"
+
+rules:
+  - rule_id: "WI79-MASTER-SAMPLE"
+    name: "Master sample validation status"
+    severity: "CRITICAL"
+    mandatory: true
+    zero_tolerance: true
+    description: "Master sample verification status must be OK for active production"
+
+  - rule_id: "WI79-PART-NUMBER"
+    name: "Part number match with master sample"
+    severity: "CRITICAL"
+    mandatory: true
+    zero_tolerance: true
+    description: "Part number on harness specification sticker matches master sample and blueprint"
+
+  - rule_id: "WI79-REVISION"
+    name: "Part revision match with master sample"
+    severity: "MAJOR"
+    mandatory: true
+    zero_tolerance: false
+    description: "Engineering revision matches master sample specification"
+
+  - rule_id: "WI79-CONNECTOR-COLORS"
+    name: "Connector colour verification"
+    severity: "CRITICAL"
+    mandatory: true
+    zero_tolerance: true
+    description: "All connector housings and color-coded position tapes match specification"
+
+  - rule_id: "WI79-DUMMY-SEALS"
+    name: "Dummy seal presence"
+    severity: "CRITICAL"
+    mandatory: true
+    zero_tolerance: true
+    description: "Dummy seals present and correctly seated in unpopulated connector cavities"
+
+  - rule_id: "WI79-TBO-CHECK"
+    name: "Terminal Back Out (TBO) check"
+    severity: "CRITICAL"
+    mandatory: true
+    zero_tolerance: true
+    description: "No terminal pushed back; all terminal secondary locks fully engaged"
+
+  - rule_id: "WI79-BRANCH-SIZES"
+    name: "Branch wire & conduit bundle sizes"
+    severity: "MAJOR"
+    mandatory: true
+    zero_tolerance: false
+    description: "Wire count and corrugated tube diameters match blueprint specification"
+
+  - rule_id: "WI79-CLAMP-COUNT-POS"
+    name: "Clamp count and positions"
+    severity: "CRITICAL"
+    mandatory: true
+    zero_tolerance: false
+    description: "All specified clips and clamps present at designated positions relative to master sample"
+
+  - rule_id: "WI79-PART-LABEL"
+    name: "Part number label presence and legibility"
+    severity: "CRITICAL"
+    mandatory: true
+    zero_tolerance: true
+    description: "Specification sticker present, undamaged, and barcode payload valid"
+
+  - rule_id: "WI79-CLAMP-STAMP"
+    name: "Clamp stamp check"
+    severity: "MAJOR"
+    mandatory: true
+    zero_tolerance: false
+    description: "Inspection clamp stamp applied at designated inspection checkpoints"
+
+  - rule_id: "WI79-CIRCUIT-STAMP"
+    name: "Circuit stamp check"
+    severity: "MAJOR"
+    mandatory: true
+    zero_tolerance: false
+    description: "Electrical continuity circuit stamp present and verified"
+
+  - rule_id: "WI79-PACKING-TAPING"
+    name: "Paper and optional protective taping"
+    severity: "MINOR"
+    mandatory: false
+    zero_tolerance: false
+    description: "Paper wraps and optional protective wrapping comply with packing standard"
+
+  - rule_id: "WI79-HOUSING-TERMINAL"
+    name: "Housing & terminal integrity"
+    severity: "CRITICAL"
+    mandatory: true
+    zero_tolerance: true
+    description: "No housing cracks, deformation, terminal damage, or lance breakage"
+
+  - rule_id: "WI79-NO-PART-MISSING"
+    name: "Zero missing component standard"
+    severity: "CRITICAL"
+    mandatory: true
+    zero_tolerance: true
+    description: "No component, grommet, clip, lock, or wire missing anywhere on workpiece"

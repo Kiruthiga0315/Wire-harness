@@ -1,0 +1,60 @@
+version: "1.0.0"
+pack_id: "taping_standard"
+name: "Branch Taping Standard"
+source_doc: "BT45-02 Branch Taping Standard"
+
+branch_types:
+  W:
+    min_laps: 26
+    max_laps: 30
+    allow_cross_taping: false
+  X:
+    min_laps: 28
+    max_laps: 30
+    allow_cross_taping: true
+  T:
+    min_laps: 19
+    max_laps: 22
+    allow_cross_taping: false
+  Y:
+    min_laps: 19
+    max_laps: 22
+    allow_cross_taping: false
+  V:
+    min_laps: 19
+    max_laps: 22
+    allow_cross_taping: false
+
+general_rules:
+  step_laps_min: 7
+  step_laps_max: 8
+  completion_laps_min: 5
+  completion_laps_max: 6
+  extension_from_node_mm: 30.0
+  defects_allowed: false
+  no_cross_taping_except: ["X"]
+  no_excess_taping: true
+  no_loose_taping: true
+
+cycle_time_ranks:
+  S:
+    max_seconds: 22.0
+  A:
+    min_seconds: 25.0
+    max_seconds: 30.0
+  B:
+    min_seconds: 31.0
+    max_seconds: 35.0
+  C:
+    min_seconds: 36.0
+    max_seconds: 40.0
+  D:
+    min_seconds: 41.0
+    max_seconds: 9999.0
+
+time_gap_handling:
+  gap_range: [23.0, 24.99]
+  gap_action: "REVIEW"  # 23-24s gap => REVIEW
+
+minimum_accepted_rank: "C"
+rank_d_action: "FAIL"

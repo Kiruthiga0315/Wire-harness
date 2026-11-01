@@ -1,0 +1,107 @@
+version: "1.0.0"
+pack_id: "msil_tolerances"
+name: "MSIL Dimensional Tolerance Chart"
+source_doc: "MSIL Tolerance Chart / Engineering Drawing (unless special tolerance in drawing)"
+customer: "MSIL"
+part_number: "YH200502"
+harness_type: "YHB Engine Harness"
+
+nominal_classes:
+  - max_nominal_mm: 200.0
+    main_trunk:
+      tol_pos: 10.0
+      tol_neg: 10.0
+    branch_wire:
+      tol_pos: 20.0
+      tol_neg: 0.0
+    single_wire:
+      tol_pos: 20.0
+      tol_neg: 0.0
+    clamp_to_clamp:
+      tol_pos: 5.0
+      tol_neg: 5.0
+
+  - min_nominal_mm: 200.0001
+    max_nominal_mm: 500.0
+    main_trunk:
+      tol_pos: 15.0
+      tol_neg: 15.0
+    branch_wire:
+      tol_pos: 30.0
+      tol_neg: 0.0
+    single_wire:
+      tol_pos: 30.0
+      tol_neg: 0.0
+    clamp_to_clamp:
+      tol_pos: 5.0
+      tol_neg: 5.0
+
+  - min_nominal_mm: 500.0001
+    max_nominal_mm: 2000.0
+    main_trunk:
+      tol_pos: 20.0
+      tol_neg: 20.0
+    branch_wire:
+      tol_pos: 40.0
+      tol_neg: 0.0
+    single_wire:
+      tol_pos: 40.0
+      tol_neg: 0.0
+    clamp_to_clamp:
+      tol_pos: 10.0
+      tol_neg: 10.0
+
+  - min_nominal_mm: 2000.0001
+    max_nominal_mm: 5000.0
+    main_trunk:
+      tol_pos: 25.0
+      tol_neg: 25.0
+    branch_wire:
+      tol_pos: 50.0
+      tol_neg: 0.0
+    single_wire:
+      tol_pos: 50.0
+      tol_neg: 0.0
+    clamp_to_clamp:
+      tol_pos: 10.0
+      tol_neg: 10.0
+
+  - min_nominal_mm: 5000.0001
+    max_nominal_mm: 999999.0
+    main_trunk:
+      tol_pos: 75.0
+      tol_neg: 75.0
+    branch_wire:
+      tol_pos: null
+      tol_neg: null
+    single_wire:
+      tol_pos: null
+      tol_neg: null
+    clamp_to_clamp:
+      tol_pos: null
+      tol_neg: null
+
+subject_column_mapping:
+  "Protector-Clip": "clamp_to_clamp"
+  "Protector-Protector": "clamp_to_clamp"
+  "Clamp-Clamp": "clamp_to_clamp"
+  "Clip-Branch wire": "main_trunk"
+  "Protector-Branch wire": "main_trunk"
+  "Protector-End branch": "branch_wire"
+
+negative_side_guard:
+  enabled: true
+  threshold_ratio: 0.80  # Deviation below -80% of tolerance => REVIEW
+
+variant_overrides:
+  "YH200502":
+    "CP-T01":
+      special_tolerance: true
+      tol_pos: 20.0
+      tol_neg: 0.0
+      reason: "Drawing specific callout for J1-T1 branch"
+    "CP-T02":
+      special_tolerance: true
+      tol_pos: 20.0
+      tol_neg: 0.0
+      reason: "Drawing specific callout for J1-T2 branch"

@@ -1,0 +1,245 @@
+version: "1.0.0"
+pack_id: "ptdb_yh200502"
+name: "Past Trouble Database Regression Check"
+source_doc: "MSIL PTDB YH200502 (23 MSIL Concerns Oct'25-Mar'26)"
+part_number: "YH200502"
+customer: "MSIL"
+
+concerns:
+  - rule_id: "PTDB-01"
+    ptdb_ref: "MSIL-CONCERN-2025-10-01"
+    description: "4P black O2 sensor coupler branch length short/long"
+    category: "branch_length"
+    coupler_type: "4P Black O2 Sensor"
+    repeat_count: 3
+    highlighted: true
+    vehicle_reported: true
+    severity: "CRITICAL"
+    mandatory: true
+
+  - rule_id: "PTDB-02"
+    ptdb_ref: "MSIL-CONCERN-2025-10-04"
+    description: "EGR coupler branch length short/long"
+    category: "branch_length"
+    coupler_type: "EGR Coupler"
+    repeat_count: 1
+    highlighted: false
+    vehicle_reported: false
+    severity: "MAJOR"
+    mandatory: true
+
+  - rule_id: "PTDB-03"
+    ptdb_ref: "MSIL-CONCERN-2025-11-02"
+    description: "Injector branch length short/long"
+    category: "branch_length"
+    coupler_type: "Injector Branch"
+    repeat_count: 2
+    highlighted: true
+    vehicle_reported: true
+    severity: "CRITICAL"
+    mandatory: true
+
+  - rule_id: "PTDB-04"
+    ptdb_ref: "MSIL-CONCERN-2025-11-08"
+    description: "2P blue CNG injector coupler branch length short/long"
+    category: "branch_length"
+    coupler_type: "2P Blue CNG Injector"
+    repeat_count: 1
+    highlighted: false
+    vehicle_reported: false
+    severity: "MAJOR"
+    mandatory: true
+
+  - rule_id: "PTDB-05"
+    ptdb_ref: "MSIL-CONCERN-2025-12-01"
+    description: "Clamp distance issue near injector"
+    category: "clamp_position"
+    repeat_count: 2
+    highlighted: true
+    vehicle_reported: false
+    severity: "MAJOR"
+    mandatory: true
+
+  - rule_id: "PTDB-06"
+    ptdb_ref: "MSIL-CONCERN-2025-12-05"
+    description: "Clamp distance issue near CNG injector coupler"
+    category: "clamp_position"
+    repeat_count: 1
+    highlighted: false
+    vehicle_reported: false
+    severity: "MAJOR"
+    mandatory: true
+
+  - rule_id: "PTDB-07"
+    ptdb_ref: "MSIL-CONCERN-2025-12-11"
+    description: "Clamp distance issue near crankshaft coupler"
+    category: "clamp_position"
+    repeat_count: 1
+    highlighted: false
+    vehicle_reported: false
+    severity: "MAJOR"
+    mandatory: true
+
+  - rule_id: "PTDB-08"
+    ptdb_ref: "MSIL-CONCERN-2026-01-03"
+    description: "Clamp-to-protector excess distance"
+    category: "clamp_position"
+    repeat_count: 2
+    highlighted: false
+    vehicle_reported: false
+    severity: "MAJOR"
+    mandatory: true
+
+  - rule_id: "PTDB-09"
+    ptdb_ref: "MSIL-CONCERN-2026-01-09"
+    description: "13 No. clamp missing / wrong direction / not cut near CNG controller coupler"
+    category: "clamp_defect"
+    repeat_count: 3
+    highlighted: true
+    vehicle_reported: true
+    severity: "CRITICAL"
+    mandatory: true
+
+  - rule_id: "PTDB-10"
+    ptdb_ref: "MSIL-CONCERN-2026-01-15"
+    description: "24 No. clamp missing / wrong direction near backlight sensor coupler, near FL"
+    category: "clamp_defect"
+    repeat_count: 2
+    highlighted: true
+    vehicle_reported: true
+    severity: "CRITICAL"
+    mandatory: true
+
+  - rule_id: "PTDB-11"
+    ptdb_ref: "MSIL-CONCERN-2026-02-01"
+    description: "Protector wrong or lock NG near ECM coupler"
+    category: "protector_defect"
+    repeat_count: 2
+    highlighted: true
+    vehicle_reported: false
+    severity: "CRITICAL"
+    mandatory: true
+
+  - rule_id: "PTDB-12"
+    ptdb_ref: "MSIL-CONCERN-2026-02-06"
+    description: "Grommet missing on 4P black CNG rail coupler"
+    category: "missing_component"
+    repeat_count: 2
+    highlighted: true
+    vehicle_reported: true
+    severity: "CRITICAL"
+    mandatory: true
+
+  - rule_id: "PTDB-13"
+    ptdb_ref: "MSIL-CONCERN-2026-02-12"
+    description: "Coupler interchange: 4P grey air-cleaner vs 3P black MAF coupler branch"
+    category: "coupler_interchange"
+    repeat_count: 3
+    highlighted: true
+    vehicle_reported: true
+    severity: "CRITICAL"
+    mandatory: true
+
+  - rule_id: "PTDB-14"
+    ptdb_ref: "MSIL-CONCERN-2026-02-18"
+    description: "Routing wrong: injector interconnection branch/coupler (repeated)"
+    category: "routing_defect"
+    repeat_count: 4
+    highlighted: true
+    vehicle_reported: true
+    severity: "CRITICAL"
+    mandatory: true
+
+  - rule_id: "PTDB-15"
+    ptdb_ref: "MSIL-CONCERN-2026-02-23"
+    description: "Taping / cloth-tape miss: alternator GND (grey)"
+    category: "taping_defect"
+    repeat_count: 2
+    highlighted: false
+    vehicle_reported: false
+    severity: "MAJOR"
+    mandatory: true
+
+  - rule_id: "PTDB-16"
+    ptdb_ref: "MSIL-CONCERN-2026-03-01"
+    description: "Taping / cloth-tape miss: crank sensor coupler"
+    category: "taping_defect"
+    repeat_count: 1
+    highlighted: false
+    vehicle_reported: false
+    severity: "MAJOR"
+    mandatory: true
+
+  - rule_id: "PTDB-17"
+    ptdb_ref: "MSIL-CONCERN-2026-03-05"
+    description: "Rear O2 sensor coupler height taping NG"
+    category: "taping_defect"
+    repeat_count: 2
+    highlighted: false
+    vehicle_reported: false
+    severity: "MAJOR"
+    mandatory: true
+
+  - rule_id: "PTDB-18"
+    ptdb_ref: "MSIL-CONCERN-2026-03-09"
+    description: "'cot' damage on O2 coupler branch"
+    category: "corrugated_tube_defect"
+    repeat_count: 2
+    highlighted: true
+    vehicle_reported: true
+    severity: "CRITICAL"
+    mandatory: true
+
+  - rule_id: "PTDB-19"
+    ptdb_ref: "MSIL-CONCERN-2026-03-12"
+    description: "Crimping fail / PVC highlight at terminal"
+    category: "terminal_defect"
+    repeat_count: 2
+    highlighted: true
+    vehicle_reported: false
+    requires_operator_attestation: true
+    severity: "CRITICAL"
+    mandatory: true
+
+  - rule_id: "PTDB-20"
+    ptdb_ref: "MSIL-CONCERN-2026-03-16"
+    description: "Conductor out at terminal"
+    category: "terminal_defect"
+    repeat_count: 3
+    highlighted: true
+    vehicle_reported: true
+    requires_operator_attestation: true
+    severity: "CRITICAL"
+    mandatory: true
+
+  - rule_id: "PTDB-21"
+    ptdb_ref: "MSIL-CONCERN-2026-03-20"
+    description: "White-wire TBO at CNG controller coupler"
+    category: "terminal_defect"
+    repeat_count: 2
+    highlighted: true
+    vehicle_reported: true
+    requires_operator_attestation: true
+    severity: "CRITICAL"
+    mandatory: true
+
+  - rule_id: "PTDB-22"
+    ptdb_ref: "MSIL-CONCERN-2026-03-24"
+    description: "Relay box terminal seating lock loose"
+    category: "housing_defect"
+    repeat_count: 1
+    highlighted: false
+    vehicle_reported: false
+    requires_operator_attestation: true
+    severity: "MAJOR"
+    mandatory: true
+
+  - rule_id: "PTDB-23"
+    ptdb_ref: "MSIL-CONCERN-2026-03-28"
+    description: "Fuse box bracket clip orientation reverse"
+    category: "bracket_clip_defect"
+    repeat_count: 1
+    highlighted: false
+    vehicle_reported: false
+    severity: "MAJOR"
+    mandatory: true
