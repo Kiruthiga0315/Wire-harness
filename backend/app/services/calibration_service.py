@@ -76,46 +76,81 @@ def detect_tape_calibration(
     tape_row_search_top: float = 0.0,
     tape_row_search_bottom: float = 0.08,
 ) -> dict[str, Any]:
-    """Detect yellow measuring tape in *image* and return calibration metrics."""
+    """Detect yellow measuring tape in *image* and return calibration metrics.
+    
+    Validates genuine continuous yellow tape span (>= 40% width and >= 2% density).
+    When verified tape is detected, extracts periodic decimeter rhythm from tape
+    contrast profile to derive actual optical scale.
+    """
     if image is None or image.ndim != 3:
         return _fallback_calibration(image, reason="invalid_image")
 
     h, w = image.shape[:2]
     row_top = int(h * tape_row_search_top)
-    row_bot = int(h * tape_row_search_bottom)
+    row_bot = max(int(h * tape_row_search_bottom), 20)
 
-    hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-    tape_hsv = hsv[row_top:row_bot, :, :]
+    hsv = cv2.cvtColor(image[row_top:row_bot, :, :], cv2.COLOR_BGR2HSV)
 
     # Yellow mask
     yellow_mask = cv2.inRange(
-        tape_hsv,
+        hsv,
         np.array([15, 70, 70], dtype=np.uint8),
         np.array([40, 255, 255], dtype=np.uint8),
     )
 
-    if not np.any(yellow_mask):
+    total_yellow = int(np.count_nonzero(yellow_mask))
+    band_area = (row_bot - row_top) * w
+
+    if total_yellow == 0:
         return _fallback_calibration(image, reason="no_yellow_tape")
 
-    # Densest yellow row
+    cols_with_yellow = np.where(np.any(yellow_mask, axis=0))[0]
+    tape_px_span = float(cols_with_yellow[-1] - cols_with_yellow[0]) if len(cols_with_yellow) > 0 else 0.0
+    span_ratio = tape_px_span / float(w) if w > 0 else 0.0
+    density = float(total_yellow) / float(band_area) if band_area > 0 else 0.0
+
+    # Genuine physical tape must span across at least 40% of the board with sufficient density
+    if span_ratio < 0.40 or density < 0.02:
+        return _fallback_calibration(image, reason="insufficient_tape_span")
+
+    # Densest yellow row (tape centerline)
     row_sums = np.sum(yellow_mask, axis=1)
     tape_center_row = int(np.argmax(row_sums)) + row_top
 
-    px_cm = pixels_per_cm_for_width(w)
-    px_mm = pixels_per_mm_for_width(w)
+    # Extract decimeter peak intervals from centerline grayscale profile
+    try:
+        import scipy.signal
 
-    cols_with_yellow = np.where(np.any(yellow_mask, axis=0))[0]
-    tape_px_span = float(cols_with_yellow[-1] - cols_with_yellow[0]) if len(cols_with_yellow) > 0 else float(w)
-    tape_cm_span = round(tape_px_span / px_cm, 1) if px_cm > 0 else 0.0
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        r_start = max(0, tape_center_row - 3)
+        r_end = min(h, tape_center_row + 4)
+        band = gray[r_start:r_end, :]
+        inv_signal = 255.0 - np.min(band, axis=0).astype(float)
 
-    return {
-        "pixels_per_mm": px_mm,
-        "pixels_per_cm": px_cm,
-        "method": "tape-detected",
-        "tape_pixel_span": tape_px_span,
-        "tape_cm_span": tape_cm_span,
-        "tape_row_center": tape_center_row,
-    }
+        expected_decimeter_px = _CALIB_PX_PER_CM * 10.0 * (float(w) / float(_CALIB_IMAGE_WIDTH_PX))
+        min_dist = max(20, int(expected_decimeter_px * 0.6))
+        peaks, _ = scipy.signal.find_peaks(inv_signal, prominence=14, distance=min_dist)
+
+        if len(peaks) >= 3:
+            diffs = np.diff(peaks)
+            med_diff = float(np.median(diffs))
+            # Validate median diff matches reasonable optical decimeter bounds
+            if 0.5 * expected_decimeter_px <= med_diff <= 1.5 * expected_decimeter_px:
+                px_cm = round(med_diff / 10.0, 4)
+                px_mm = round(px_cm / 10.0, 5)
+                tape_cm_span = round(tape_px_span / px_cm, 1) if px_cm > 0 else 0.0
+                return {
+                    "pixels_per_mm": px_mm,
+                    "pixels_per_cm": px_cm,
+                    "method": "tape-detected",
+                    "tape_pixel_span": tape_px_span,
+                    "tape_cm_span": tape_cm_span,
+                    "tape_row_center": tape_center_row,
+                }
+    except Exception as exc:
+        logger.warning("Decimeter peak extraction exception: %s", exc)
+
+    return _fallback_calibration(image, reason="tape_peaks_unresolved")
 
 
 def _fallback_calibration(

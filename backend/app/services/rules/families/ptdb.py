@@ -120,8 +120,27 @@ def evaluate_ptdb_regression(
             matching_cps = _find_matching_checkpoints(checkpoints, kws)
 
             if matching_cps and calibrated:
-                # Check if any matching checkpoint has failed or is unresolved
+                if context.vision and context.vision.calibration_provenance == "width-scaled":
+                    results.append(
+                        RuleResult(
+                            rule_id=rid,
+                            family="ptdb_yh200502",
+                            name=f"{ptdb_ref}: {desc}",
+                            source_doc=source_doc,
+                            severity=severity,
+                            status="REVIEW",
+                            mandatory=mandatory,
+                            expected=f"Tape or manual calibration for branch dimension verification",
+                            actual="Calibration provenance is width-scaled (estimated)",
+                            reason=f"Width-scaled calibration cannot confirm drawing branch lengths for {desc}. Requires verification.",
+                            reaction_plan=REACTION_PLAN,
+                        )
+                    )
+                    continue
+
+                # Check if any matching checkpoint has failed, is under review, or is unresolved
                 failed = [cp for cp in matching_cps if cp.get("status") == "FAIL"]
+                reviewed = [cp for cp in matching_cps if cp.get("status") == "REVIEW"]
                 unresolved = [cp for cp in matching_cps if cp.get("measured_mm") is None]
                 if failed:
                     bad_ids = [cp.get("checkpoint_id") for cp in failed]
@@ -137,6 +156,23 @@ def evaluate_ptdb_regression(
                             expected=f"Nominal length within tolerance for {bad_ids}",
                             actual=f"Checkpoint failure on {bad_ids}",
                             reason=f"Branch length regression detected on {', '.join(bad_ids)}: exceeds drawing tolerance.",
+                            reaction_plan=REACTION_PLAN,
+                        )
+                    )
+                elif reviewed:
+                    bad_ids = [cp.get("checkpoint_id") for cp in reviewed]
+                    results.append(
+                        RuleResult(
+                            rule_id=rid,
+                            family="ptdb_yh200502",
+                            name=f"{ptdb_ref}: {desc}",
+                            source_doc=source_doc,
+                            severity=severity,
+                            status="REVIEW",
+                            mandatory=mandatory,
+                            expected=f"Nominal length within tolerance for {bad_ids}",
+                            actual=f"Checkpoint under review on {bad_ids}",
+                            reason=f"Branch length for {', '.join(bad_ids)} requires review / verification.",
                             reaction_plan=REACTION_PLAN,
                         )
                     )
@@ -220,7 +256,26 @@ def evaluate_ptdb_regression(
             matching_cps = _find_matching_checkpoints(checkpoints, kws)
 
             if matching_cps and calibrated:
+                if context.vision and context.vision.calibration_provenance == "width-scaled":
+                    results.append(
+                        RuleResult(
+                            rule_id=rid,
+                            family="ptdb_yh200502",
+                            name=f"{ptdb_ref}: {desc}",
+                            source_doc=source_doc,
+                            severity=severity,
+                            status="REVIEW",
+                            mandatory=mandatory,
+                            expected="Accurate tape/manual calibration for clamp positioning verification",
+                            actual="Calibration provenance is width-scaled (estimated)",
+                            reason=f"Width-scaled calibration cannot confirm clamp positions for {desc}. Requires verification.",
+                            reaction_plan=REACTION_PLAN,
+                        )
+                    )
+                    continue
+
                 failed = [cp for cp in matching_cps if cp.get("status") == "FAIL"]
+                reviewed = [cp for cp in matching_cps if cp.get("status") == "REVIEW"]
                 unresolved = [cp for cp in matching_cps if cp.get("measured_mm") is None]
                 if failed:
                     bad_ids = [cp.get("checkpoint_id") for cp in failed]
@@ -236,6 +291,23 @@ def evaluate_ptdb_regression(
                             expected=f"Clamp position within +-5mm / +-10mm tolerance for {bad_ids}",
                             actual=f"Clamp failure on {bad_ids}",
                             reason=f"Clamp positioning regression on {', '.join(bad_ids)}: outside MSIL tolerance.",
+                            reaction_plan=REACTION_PLAN,
+                        )
+                    )
+                elif reviewed:
+                    bad_ids = [cp.get("checkpoint_id") for cp in reviewed]
+                    results.append(
+                        RuleResult(
+                            rule_id=rid,
+                            family="ptdb_yh200502",
+                            name=f"{ptdb_ref}: {desc}",
+                            source_doc=source_doc,
+                            severity=severity,
+                            status="REVIEW",
+                            mandatory=mandatory,
+                            expected=f"Clamp position verified for {bad_ids}",
+                            actual=f"Clamp under review on {bad_ids}",
+                            reason=f"Clamp positioning for {', '.join(bad_ids)} requires review / verification.",
                             reaction_plan=REACTION_PLAN,
                         )
                     )

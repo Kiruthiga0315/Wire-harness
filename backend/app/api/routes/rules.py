@@ -17,6 +17,7 @@ from app.core.settings import get_settings
 from app.models.rule_verdict import RuleVerdictRecord
 from app.services.active_image_service import active_image_service
 from app.services.cloud_io import decode_uploaded_image
+from app.services.golden_reference_service import golden_reference_service
 from app.services.rules.engine import rule_engine
 from app.services.rules.loader import rule_pack_loader
 from app.services.rules.schemas import (
@@ -137,6 +138,8 @@ def evaluate_uploaded_image(
     variant: str = Form("YH200502"),
     part_no: str = Form("YH200502"),
     operator_inputs_json: str | None = Form(None),
+    config_name: str | None = Form(None),
+    override_pixels_per_mm: float | None = Form(None),
     db: Session = Depends(get_db),
 ) -> HarnessVerdict:
     """Evaluate an uploaded image file with optional JSON-encoded operator inputs."""
@@ -164,11 +167,17 @@ def evaluate_uploaded_image(
                 detail=f"Malformed operator_inputs_json: {exc}",
             ) from exc
 
+    cfg = None
+    if config_name == "confirmed":
+        cfg = golden_reference_service.get_confirmed_configuration()
+
     verdict = rule_engine.evaluate_image(
         image=bgr_image,
         operator_input=op_input,
         variant=variant,
         part_no=part_no,
+        config=cfg,
+        override_pixels_per_mm=override_pixels_per_mm,
     )
 
     _persist_verdict(verdict, op_input, db)

@@ -78,9 +78,11 @@ class GoldenInspectionService:
         self,
         test_image_bgr: ImageArray,
         override_pixels_per_mm: float | None = None,
+        config: dict[str, Any] | None = None,
     ) -> GoldenInspectionResult:
         started = time.perf_counter()
-        config = golden_reference_service.get_configuration()
+        if config is None:
+            config = golden_reference_service.get_configuration()
         checkpoints = config.get("checkpoints", [])
 
         test_h, test_w = test_image_bgr.shape[:2]
@@ -228,11 +230,20 @@ class GoldenInspectionService:
                     deviation = round(detected_mm - expected, 1) if expected is not None else None
                     pct_dev = round((abs(deviation) / expected) * 100.0, 1) if (expected and expected > 0 and deviation is not None) else 0.0
 
-                    if expected is not None and deviation is not None and tolerance is not None:
+                    if is_calibrated and calib_info.provenance == "width-scaled":
+                        status = "REVIEW"
+                        message = f"Measurement {detected_mm} mm derived from unverified width-scaled calibration; review required"
+                        confidence = 0.75
+                    elif expected is not None and deviation is not None and tolerance is not None:
                         if abs(deviation) <= tolerance:
-                            status = "PASS"
-                            message = f"Measurement {detected_mm} mm is within tolerance ±{tolerance} mm"
-                            confidence = 0.95
+                            if cp.get("status") == "NEEDS_CONFIRMATION":
+                                status = "REVIEW"
+                                message = f"Measurement {detected_mm} mm within tentative ±{tolerance} mm, but spec requires confirmation"
+                                confidence = 0.75
+                            else:
+                                status = "PASS"
+                                message = f"Measurement {detected_mm} mm is within tolerance ±{tolerance} mm"
+                                confidence = 0.95
                         else:
                             status = "FAIL"
                             message = f"Measurement {detected_mm} mm exceeds tolerance ±{tolerance} mm (dev: {deviation:+.1f} mm)"
@@ -625,7 +636,13 @@ class GoldenInspectionService:
         except Exception as exc:
             logger.warning(f"Feature alignment fallback to scale: {exc}")
 
-        return default_matrix, 0.85
+        # Compute aspect ratio similarity: portrait / distorted images fail alignment gate
+        golden_aspect = golden_w / float(golden_h)
+        test_aspect = test_w / float(test_h)
+        aspect_sim = min(golden_aspect, test_aspect) / max(golden_aspect, test_aspect)
+        fallback_conf = round(min(0.85, max(0.40, 0.85 * aspect_sim)), 2)
+
+        return default_matrix, fallback_conf
 
 
 golden_inspection_service = GoldenInspectionService()

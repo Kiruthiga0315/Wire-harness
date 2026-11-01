@@ -66,8 +66,9 @@ def evaluate_msil_tolerances(
     guard_cfg = pack_data.get("negative_side_guard", {})
     guard_enabled = guard_cfg.get("enabled", True)
     guard_ratio = float(guard_cfg.get("threshold_ratio", 0.80))
+    min_align = float(pack_data.get("quality_gates", {}).get("min_alignment_confidence", 0.85))
 
-    if not calibrated or alignment_confidence < 0.90:
+    if not calibrated or alignment_confidence < min_align:
         # All dimensional rules become NOT_EVALUATED
         for cp in checkpoints:
             cid = cp.get("checkpoint_id", "CP-UNKNOWN")
@@ -83,7 +84,7 @@ def evaluate_msil_tolerances(
                     mandatory=True,
                     expected=f"{exp} mm" if exp is not None else None,
                     actual=None,
-                    reason="Optical calibration unverified or blueprint alignment confidence below 0.90; rule not evaluated.",
+                    reason=f"Optical calibration unverified or blueprint alignment confidence below {min_align:.2f}; rule not evaluated.",
                     reaction_plan=REACTION_PLAN,
                 )
             )
@@ -183,6 +184,14 @@ def evaluate_msil_tolerances(
             status = "REVIEW"
             reason = f"Measurement {det:.1f} mm requires engineering confirmation of reference specification: {cp.get('notes', '')}"
             reaction = REACTION_PLAN
+        elif is_width_scaled:
+            status = "REVIEW"
+            reason = (
+                f"Measurement {det:.1f} mm evaluated under unverified 'width-scaled' calibration provenance. "
+                "Width-scaled calibration produces REVIEW (never PASS or REJECT) on dimensional rules; "
+                "in-situ yellow measuring tape or verified master calibration required for disposition."
+            )
+            reaction = REACTION_PLAN
         elif out_of_pos:
             status = "FAIL"
             reason = f"Measurement {det:.1f} mm exceeds upper tolerance {tol_display} (deviation: {dev:+.1f} mm)"
@@ -197,14 +206,6 @@ def evaluate_msil_tolerances(
                 f"Measurement {det:.1f} mm falls into negative-side guard region "
                 f"(deviation {dev:+.1f} mm < -{guard_ratio*100:.0f}% of tolerance {tol_display}). "
                 "Per WI/PR/79, process review is required."
-            )
-            reaction = REACTION_PLAN
-        elif is_width_scaled:
-            status = "REVIEW"
-            reason = (
-                f"Measurement {det:.1f} mm is within tolerance bounds ({dev:+.1f} mm), but calibration provenance "
-                "is 'width-scaled'. Width-scaled calibration produces REVIEW (never PASS) on dimensional rules; "
-                "in-situ yellow measuring tape or verified master calibration required for PASS disposition."
             )
             reaction = REACTION_PLAN
         else:

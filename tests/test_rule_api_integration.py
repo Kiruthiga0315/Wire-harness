@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 import cv2
+import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 
@@ -127,85 +128,191 @@ def full_operator_input_dict() -> dict:
     }
 
 
-def test_evaluate_upload_board_crop_1800x560_accept_and_mutated_reject(
+def generate_synthetic_workpiece(mutate_branch_too_long: bool = False) -> tuple[np.ndarray, bytes]:
+    """Generate a high-fidelity synthetic workpiece differing from the golden image:
+    - Dimensions: 1800x560
+    - Real in-situ yellow measuring tape with decimeter tick rhythm (provenance: tape-detected)
+    - Corner fiducials ensuring high alignment confidence (>= 0.85)
+    - Part number label sticker YH200502
+    - Zero-crossing non-colliding routing for all 10 confirmed checkpoints
+    - If mutate_branch_too_long is True, CP-T01 is routed 30 mm out of drawing tolerance.
+    """
+    h, w = 560, 1800
+    img = np.full((h, w, 3), 245, dtype=np.uint8)
+
+    # Alignment fiducials
+    cv2.rectangle(img, (20, 20), (1780, 540), (210, 210, 210), 2)
+    cv2.circle(img, (50, 50), 10, (100, 100, 100), -1)
+    cv2.circle(img, (1750, 50), 10, (100, 100, 100), -1)
+    cv2.circle(img, (50, 510), 10, (100, 100, 100), -1)
+    cv2.circle(img, (1750, 510), 10, (100, 100, 100), -1)
+
+    # Yellow measuring tape at top band y=8..38, x=100..1700 with decimeter ticks
+    img[8:38, 100:1700] = (25, 215, 245)
+    for tx in range(120, 1680, 196):
+        img[8:38, tx:tx + 5] = (20, 20, 20)
+
+    # Part number label sticker
+    cv2.rectangle(img, (800, 250), (950, 300), (255, 255, 255), -1)
+    cv2.putText(img, "YH200502", (810, 285), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 2)
+
+    # Clean non-colliding routes for confirmed checkpoints
+    routes = {
+        "CP-T08": [(439, 268), (584, 268)],
+        "CP-T07": [(577, 481), (942, 481)],
+        "CP-T06": [(469, 551), (873, 551)],
+        "CP-T04": [(424, 409), (1204, 409)],
+        "CP-NODE-N01-N02": [(200, 350), (200, 370), (740, 370)],
+        "CP-NODE-N05-N06": [(750, 350), (750, 310), (1778, 310)],
+        "CP-T01": [(130, 272), (130, 220), (921, 220)] if mutate_branch_too_long else [(130, 272), (130, 220), (852, 220)],
+        "CP-T02": [(29, 385), (29, 160), (715, 160)],
+        "CP-T03": [(356, 533), (356, 445), (1042, 445)],
+        "CP-T05": [(405, 536), (405, 515), (1158, 515)],
+    }
+
+    for cid, pts in routes.items():
+        cv2.polylines(img, [np.array(pts, dtype=np.int32)], False, (20, 20, 20), 4)
+
+    success, png_bytes = cv2.imencode(".png", img)
+    assert success
+    return img, png_bytes.tobytes()
+
+
+def test_evaluate_upload_confirmed_specs_accept(
+    client: TestClient,
+    full_operator_input_dict: dict,
+) -> None:
+    """Item 3: Evaluate confirmed specs on a synthetic workpiece differing from golden image -> assert ACCEPT.
+    Asserts 0 FAIL, 0 REVIEW, 0 NOT_EVALUATED with tape-detected calibration.
+    Prints image path, size, calibration provenance, alignment confidence, and evaluated rules.
+    """
+    img_bgr, img_bytes = generate_synthetic_workpiece(mutate_branch_too_long=False)
+    h, w = img_bgr.shape[:2]
+
+    resp = client.post(
+        "/api/rules/evaluate/upload",
+        files={"file": ("synthetic_workpiece.png", img_bytes, "image/png")},
+        data={
+            "variant": "YH200502",
+            "part_no": "YH200502",
+            "config_name": "confirmed",
+            "operator_inputs_json": json.dumps(full_operator_input_dict),
+        },
+    )
+    assert resp.status_code == 200, f"Error: {resp.text}"
+    data = resp.json()
+
+    print("\n--- AUDIT DIAGNOSTICS: CONFIRMED WORKPIECE INSPECTION ---")
+    print(f"Image Source: Synthetic compliant test workpiece (differs from golden image)")
+    print(f"Image Size: {w}x{h}")
+    print(f"Calibration Provenance: {data['calibration_provenance']}")
+    gate_align = next((r for r in data["rule_results"] if r["rule_id"] == "GATE-ALIGNMENT"), None)
+    align_status = gate_align["status"] if gate_align else "N/A"
+    print(f"Alignment Gate: {align_status}")
+    print(f"Verdict: {data['verdict']}")
+    print(f"Summary: {data['summary']}")
+    print(f"Evaluated Rules Count: {len(data['rule_results'])}")
+    print("Evaluated Rules Sample:")
+    for r in data["rule_results"][:12]:
+        print(f"  {r['rule_id']} [{r['status']}] ({r['family']}): {r['name']}")
+
+    assert data["verdict"] == "ACCEPT"
+    assert data["calibration_provenance"] == "tape-detected"
+    assert data["summary"]["FAIL"] == 0
+    assert data["summary"]["REVIEW"] == 0
+    assert data["summary"]["NOT_EVALUATED"] == 0
+    assert data["summary"]["PASS"] == 66
+    assert "All mandatory quality inspection criteria satisfied." in data["reasons"]
+
+
+def test_evaluate_upload_full_47_checkpoints_real_image_yields_hold(
     client: TestClient,
     board_crop_path: Path,
     full_operator_input_dict: dict,
 ) -> None:
-    """Integration test on 1800x560 board crop:
-    - Verifies ACCEPT disposition when confirmed checkpoints match engineering specifications,
-      in-situ measuring tape provides verified calibration, and all operator entries pass.
-    - Prints image path, size, calibration provenance, alignment confidence, and evaluated rules.
-    - Mutates FRM19 check item 3 (circuit check) to NG and asserts deterministic REJECT.
-    """
-    img_bgr = cv2.imread(str(board_crop_path))
-    assert img_bgr is not None
-    h, w = img_bgr.shape[:2]
+    """Item 3: Full 47-checkpoint config on a real image yields HOLD, not ACCEPT."""
     img_bytes = board_crop_path.read_bytes()
+    resp = client.post(
+        "/api/rules/evaluate/upload",
+        files={"file": (board_crop_path.name, img_bytes, "image/png")},
+        data={
+            "variant": "YH200502",
+            "part_no": "YH200502",
+            "operator_inputs_json": json.dumps(full_operator_input_dict),
+        },
+    )
+    assert resp.status_code == 200
+    data = resp.json()
 
-    orig_cfg = golden_reference_service.get_configuration()
+    print("\n--- AUDIT DIAGNOSTICS: FULL 47-CHECKPOINT REAL IMAGE INSPECTION ---")
+    print(f"Image Path: {board_crop_path}")
+    print(f"Calibration Provenance: {data['calibration_provenance']}")
+    print(f"Verdict: {data['verdict']}")
+    print(f"Summary: {data['summary']}")
 
-    try:
-        # In confirmed production run, drawing-confirmed checkpoints are loaded
-        conf_cfg = copy.deepcopy(orig_cfg)
-        conf_cfg["checkpoints"] = [
-            cp for cp in orig_cfg.get("checkpoints", []) if cp.get("status") == "CONFIRMED"
-        ]
-        golden_reference_service.save_configuration(conf_cfg)
+    # Must yield HOLD because unconfirmed checkpoints and width-scaled calibration produce REVIEW
+    assert data["verdict"] == "HOLD"
+    assert data["calibration_provenance"] == "width-scaled"
+    assert data["summary"]["REVIEW"] > 0
 
-        # 1. EVALUATE WITH FULL OPERATOR SHEET -> ACCEPT
-        resp_accept = client.post(
-            "/api/rules/evaluate/upload",
-            files={"file": (board_crop_path.name, img_bytes, "image/png")},
-            data={
-                "variant": "YH200502",
-                "part_no": "YH200502",
-                "operator_inputs_json": json.dumps(full_operator_input_dict),
-            },
-        )
-        assert resp_accept.status_code == 200, f"Error: {resp_accept.text}"
-        data_accept = resp_accept.json()
 
-        # Print audit diagnostics
-        print("\n--- AUDIT DIAGNOSTICS: 1800x560 BOARD CROP INSPECTION ---")
-        print(f"Image Path: {board_crop_path}")
-        print(f"Image Size: {w}x{h} (board crop)")
-        print(f"Calibration Provenance: {data_accept['calibration_provenance']}")
-        print(f"Verdict: {data_accept['verdict']}")
-        print(f"Summary: {data_accept['summary']}")
-        print(f"Evaluated Rules Count: {len(data_accept['rule_results'])}")
-        print("Evaluated Rules Sample:")
-        for r in data_accept["rule_results"][:10]:
-            print(f"  {r['rule_id']} [{r['status']}] ({r['family']}): {r['name']}")
+def test_evaluate_upload_branch_too_long_reject(
+    client: TestClient,
+    full_operator_input_dict: dict,
+) -> None:
+    """Item 3: Harness with one branch 30 mm too long yields REJECT."""
+    _, img_bytes = generate_synthetic_workpiece(mutate_branch_too_long=True)
 
-        assert data_accept["verdict"] == "ACCEPT"
-        assert data_accept["calibration_provenance"] == "tape-detected"
-        assert data_accept["summary"]["FAIL"] == 0
-        assert data_accept["summary"]["REVIEW"] == 0
-        assert data_accept["summary"]["NOT_EVALUATED"] == 0
-        assert "All mandatory quality inspection criteria satisfied." in data_accept["reasons"]
+    resp = client.post(
+        "/api/rules/evaluate/upload",
+        files={"file": ("workpiece_too_long.png", img_bytes, "image/png")},
+        data={
+            "variant": "YH200502",
+            "part_no": "YH200502",
+            "config_name": "confirmed",
+            "operator_inputs_json": json.dumps(full_operator_input_dict),
+        },
+    )
+    assert resp.status_code == 200
+    data = resp.json()
 
-        # 2. MUTATED SHEET -> REJECT
-        mutated_input = copy.deepcopy(full_operator_input_dict)
-        mutated_input["check_sheet"]["checks"]["FRM19-03-NO-CKT-WRONG"]["first_piece"] = "NG"
+    print("\n--- AUDIT DIAGNOSTICS: OUT-OF-SPEC BRANCH INSPECTION ---")
+    print(f"Verdict: {data['verdict']}")
+    print(f"Summary: {data['summary']}")
 
-        resp_reject = client.post(
-            "/api/rules/evaluate/upload",
-            files={"file": (board_crop_path.name, img_bytes, "image/png")},
-            data={
-                "variant": "YH200502",
-                "part_no": "YH200502",
-                "operator_inputs_json": json.dumps(mutated_input),
-            },
-        )
-        assert resp_reject.status_code == 200
-        data_reject = resp_reject.json()
-        assert data_reject["verdict"] == "REJECT"
-        assert data_reject["summary"]["CRITICAL_FAIL"] >= 1
-        failed_ids = [r["rule_id"] for r in data_reject["rule_results"] if r["status"] == "FAIL"]
-        assert "FRM19-03-NO-CKT-WRONG" in failed_ids
-    finally:
-        golden_reference_service.save_configuration(orig_cfg)
+    assert data["verdict"] == "REJECT"
+    assert data["summary"]["CRITICAL_FAIL"] >= 1
+    t01_res = next((r for r in data["rule_results"] if r["rule_id"] == "MSIL-TOL-CP-T01"), None)
+    assert t01_res is not None
+    assert t01_res["status"] == "FAIL"
+    assert "exceeds" in t01_res["reason"].lower()
+
+
+def test_evaluate_upload_mutated_operator_sheet_reject(
+    client: TestClient,
+    full_operator_input_dict: dict,
+) -> None:
+    """Mutated operator check sheet (FRM19 item 3 set to NG) yields deterministic REJECT."""
+    _, img_bytes = generate_synthetic_workpiece(mutate_branch_too_long=False)
+    mutated_input = copy.deepcopy(full_operator_input_dict)
+    mutated_input["check_sheet"]["checks"]["FRM19-03-NO-CKT-WRONG"]["first_piece"] = "NG"
+
+    resp_reject = client.post(
+        "/api/rules/evaluate/upload",
+        files={"file": ("workpiece.png", img_bytes, "image/png")},
+        data={
+            "variant": "YH200502",
+            "part_no": "YH200502",
+            "config_name": "confirmed",
+            "operator_inputs_json": json.dumps(mutated_input),
+        },
+    )
+    assert resp_reject.status_code == 200
+    data_reject = resp_reject.json()
+    assert data_reject["verdict"] == "REJECT"
+    assert data_reject["summary"]["CRITICAL_FAIL"] >= 1
+    failed_ids = [r["rule_id"] for r in data_reject["rule_results"] if r["status"] == "FAIL"]
+    assert "FRM19-03-NO-CKT-WRONG" in failed_ids
 
 
 def test_459x1024_image_gets_hold_gate(
@@ -327,4 +434,4 @@ def test_width_scaled_calibration_produces_review_never_pass() -> None:
     # MUST be REVIEW, never PASS, because calibration provenance is width-scaled
     assert res.status == "REVIEW", f"Expected REVIEW, got {res.status}"
     assert "width-scaled" in res.reason.lower()
-    assert "review (never pass)" in res.reason.lower()
+    assert "never pass" in res.reason.lower()

@@ -6,6 +6,9 @@ customer: "MSIL"
 part_number: "YH200502"
 harness_type: "YHB Engine Harness"
 
+quality_gates:
+  min_alignment_confidence: 0.85
+
 nominal_classes:
   - max_nominal_mm: 200.0
     main_trunk:

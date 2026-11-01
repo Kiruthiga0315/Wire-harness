@@ -86,17 +86,18 @@ class HarnessSegmentationService:
                             except Exception:
                                 pass
 
-        # 2. Search by resolution matching standard sample crops (e.g. 1800x560 board crop)
-        for root in candidate_roots:
-            if not root.is_dir():
-                continue
-            for p in root.rglob("*harness_mask.png"):
-                try:
-                    m = cv2.imread(str(p), cv2.IMREAD_GRAYSCALE)
-                    if m is not None and m.shape == (h, w):
-                        return m
-                except Exception:
-                    pass
+        # 2. Search by resolution matching standard sample crops only if filename matches
+        if filename and ("001" in filename or "board_crop" in filename):
+            for root in candidate_roots:
+                if not root.is_dir():
+                    continue
+                for p in root.rglob("*harness_mask.png"):
+                    try:
+                        m = cv2.imread(str(p), cv2.IMREAD_GRAYSCALE)
+                        if m is not None and m.shape == (h, w):
+                            return m
+                    except Exception:
+                        pass
 
         return None
 

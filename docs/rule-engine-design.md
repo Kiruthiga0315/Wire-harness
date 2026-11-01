@@ -225,3 +225,73 @@ The following assumptions require formal confirmation with plant quality enginee
 5. **Master Sample Validation Interval (Unverified Assumption)**:
    - *Unverified Assumption*: Master sample validation status per WI/PR/79 is assumed valid for the duration of the active 8-hour production shift.
    - *Action*: Confirm whether master sample check frequency is shift-based (8 hours), daily (24 hours), or lot/batch-based.
+
+---
+
+## 8. Checkpoint Blueprint Restoration (Before / After Table)
+
+In commit `457871f`, automated CV measurements on `001_01_board_crop.png` erroneously overwrote expected blueprint values. These were restored to official drawing / factory specifications. Any checkpoint without explicit engineering drawing lineage is marked `NEEDS_CONFIRMATION` with `placeholder: true`.
+
+| Checkpoint ID | Overwritten Value (457871f) | Restored Expected Value (mm) | Tolerance (mm) | Status | Source Lineage |
+|---|---|---|---|---|---|
+| `CP-NODE-N01-N02` | 50.1 | **285.0** | $\pm 20.0$ | CONFIRMED | `detailed.md:28` |
+| `CP-NODE-N05-N06` | 40.4 | **538.0** | $\pm 30.0$ | CONFIRMED | `detailed.md:29` |
+| `CP-T01` | 58.0 | **390.0** | $+20.0 / -0.0$ | CONFIRMED | `detailed.md:20` ("J1 - T1 = 39 cm") |
+| `CP-T02` | 36.3 | **460.0** | $+20.0 / -0.0$ | CONFIRMED | `detailed.md:21` ("J1 - T2 = 46 cm") |
+| `CP-T03` | 24.5 | **390.0** | $+30.0 / -0.0$ | CONFIRMED | `detailed.md:22` ("J1 - T3 = 39 cm") |
+| `CP-T04` | 37.1 | **390.0** | $+30.0 / -0.0$ | CONFIRMED | `detailed.md:23` ("J1 - T4 = 39 cm") |
+| `CP-T05` | 36.8 | **390.0** | $+30.0 / -0.0$ | CONFIRMED | `detailed.md:24` ("J1 - T5 = 39 cm") |
+| `CP-T06` | 36.8 | **200.0** | $+20.0 / -0.0$ | CONFIRMED | `detailed.md:25` ("J2 - T6 = 20 cm") |
+| `CP-T07` | 76.1 | **180.0** | $+20.0 / -0.0$ | CONFIRMED | `detailed.md:26` ("J3 - T7 = 18 cm") |
+| `CP-T08` | 30.8 | **70.0** | $+20.0 / -0.0$ | CONFIRMED | `detailed.md:27` ("J8 - T8 = 7 cm") |
+| `CP-T09` | 6.5 | 150.0 | $\pm 15.0$ | NEEDS_CONFIRMATION | placeholder: true |
+| `CP-T10` | 67.9 | 150.0 | $\pm 15.0$ | NEEDS_CONFIRMATION | placeholder: true |
+| `CP-T11` | 38.8 | 150.0 | $\pm 15.0$ | NEEDS_CONFIRMATION | placeholder: true |
+| `CP-T12` | 43.8 | 150.0 | $\pm 15.0$ | NEEDS_CONFIRMATION | placeholder: true |
+| `CP-T13` | 52.7 | 150.0 | $\pm 15.0$ | NEEDS_CONFIRMATION | placeholder: true |
+| `CP-T14` | 34.6 | 150.0 | $\pm 15.0$ | NEEDS_CONFIRMATION | placeholder: true |
+| `CP-T15` | 19.8 | 150.0 | $\pm 15.0$ | NEEDS_CONFIRMATION | placeholder: true |
+| `CP-T16` | 43.8 | 150.0 | $\pm 15.0$ | NEEDS_CONFIRMATION | placeholder: true |
+| `CP-T17` | 28.7 | 150.0 | $\pm 15.0$ | NEEDS_CONFIRMATION | placeholder: true |
+| `CP-T18` | 43.4 | 150.0 | $\pm 15.0$ | NEEDS_CONFIRMATION | placeholder: true |
+| `CP-T19` | 8.4 | 150.0 | $\pm 15.0$ | NEEDS_CONFIRMATION | placeholder: true |
+| `CP-T20` | 34.7 | 150.0 | $\pm 15.0$ | NEEDS_CONFIRMATION | placeholder: true |
+| `CP-T21` | 40.9 | 150.0 | $\pm 15.0$ | NEEDS_CONFIRMATION | placeholder: true |
+| `CP-T22` | 35.3 | 100.0 | $\pm 15.0$ | NEEDS_CONFIRMATION | placeholder: true |
+| `CP-T24` | 44.5 | 150.0 | $\pm 15.0$ | NEEDS_CONFIRMATION | placeholder: true |
+| `CP-T25` | 38.0 | 150.0 | $\pm 15.0$ | NEEDS_CONFIRMATION | placeholder: true |
+
+### Code Path Guard Implemented
+In `backend/app/services/golden_reference_service.py`:
+- `update_checkpoint()` strictly ignores any automated modification to `expected_value` unless `force_drawing_override: true` is explicitly passed.
+- `sync_with_active_image()` preserves existing blueprint fields (`expected_value`, `baseline_mm`, `status`, `placeholder`, `source`, `notes`) and only updates computer-vision coordinate targets (`reference_x`, `reference_y`).
+
+---
+
+## 9. Optical Scale & Calibration Provenance Diagnostics
+
+### Root Cause of Previous "tape-detected = 1.96 px/mm" Anomaly:
+Previously, `detect_tape_calibration()` in `calibration_service.py` executed:
+```python
+if np.any(yellow_mask):
+    return pixels_per_cm_for_width(image_width) / 10.0  # 1.9608 px/mm
+```
+Because `001_01_board_crop.png` had 112 stray yellow background pixels (0.14% density, 2.5% span), it falsely triggered the yellow mask check and reported provenance as `"tape-detected"`, while returning the calculated width-scaled ratio ($1800 \times \frac{5.0}{459} / 10.0 = 1.9608\text{ px/mm}$). This coincidentally matched the manual fallback value.
+
+### Resolution & Verification:
+`detect_tape_calibration()` was upgraded to require:
+1. Continuous physical measuring tape span $\ge 40\%$ of image width.
+2. Minimum yellow tape pixel density $\ge 2\%$ of the search band.
+3. Periodic decimeter tick extraction via `scipy.signal.find_peaks()` on the tape centerline profile.
+
+#### Actual Execution Output:
+- **1800x560 Board Crop (`001_01_board_crop.png`)**:
+  - `method`: `"width-scaled:insufficient_tape_span"`
+  - `provenance`: `"width-scaled"`
+  - `pixels_per_mm`: `1.96078`
+  - *Disposition Effect*: Width-scaled calibration produces `REVIEW` on all dimensional rules $\implies$ **`HOLD`**.
+- **459x1024 Raw Sample (`data/test_images/harness_sample_01.jpeg`)**:
+  - `method`: `"tape-detected"`
+  - `provenance`: `"tape-detected"`
+  - `pixels_per_mm`: `0.435` (measured from actual physical decimeter ticks)
+  - `alignment_confidence`: `0.400` ($< 0.85$ threshold) $\implies$ **`HOLD`** at `GATE-ALIGNMENT`.

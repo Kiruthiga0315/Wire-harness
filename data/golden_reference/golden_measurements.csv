@@ -1,18 +1,18 @@
 checkpoint_id,type,terminal_id,node_id,branch_id,measurement_type,expected_value,unit,tolerance,reference_x,reference_y,roi_width,roi_height,confidence,status,notes,source,source_line,placeholder
-CP-NODE-N01-N02,node_distance,,N01-N02,B-N01-N02,node_to_node_distance,119.1,mm,20.0,200,350,50,50,0.95,CONFIRMED,N1 - N2 = 28.5 cm,detailed.md:28,28,False
-CP-NODE-N03-N04,node_distance,,N03-N04,B-N03-N04,node_to_node_distance,119.1,mm,10.0,450,350,50,50,0.95,CONFIRMED,N3 - N4 = 10 cm,factory_sheet,measurement_sheet.png:N3-N4,False
-CP-NODE-N05-N06,node_distance,,N05-N06,B-N05-N06,node_to_node_distance,12.0,mm,30.0,750,350,50,50,0.95,CONFIRMED,N5 - N6 = 53.8 cm,detailed.md:28,28,False
-CP-NODE-N07-N08,node_distance,,N07-N08,B-N07-N08,node_to_node_distance,26.5,mm,10.0,1050,350,50,50,0.95,CONFIRMED,N7 - N8 = 8 cm,factory_sheet,measurement_sheet.png:N7-N8,False
-CP-NODE-N09-N10,node_distance,,N09-N10,B-N09-N10,node_to_node_distance,13.0,mm,20.0,1250,350,50,50,0.95,CONFIRMED,N9 - N10 = 23.5 cm,factory_sheet,measurement_sheet.png:N9-N10,False
+CP-NODE-N01-N02,node_distance,,N01-N02,B-N01-N02,node_to_node_distance,285.0,mm,20.0,200,350,50,50,0.95,CONFIRMED,N1 - N2 = 28.5 cm,detailed.md:28,28,False
+CP-NODE-N03-N04,node_distance,,N03-N04,B-N03-N04,node_to_node_distance,100.0,mm,10.0,450,350,50,50,0.95,NEEDS_CONFIRMATION,N3 - N4 = 10 cm,placeholder,,True
+CP-NODE-N05-N06,node_distance,,N05-N06,B-N05-N06,node_to_node_distance,538.0,mm,30.0,750,350,50,50,0.95,CONFIRMED,N5 - N6 = 53.8 cm,detailed.md:28,28,False
+CP-NODE-N07-N08,node_distance,,N07-N08,B-N07-N08,node_to_node_distance,80.0,mm,10.0,1050,350,50,50,0.95,NEEDS_CONFIRMATION,N7 - N8 = 8 cm,placeholder,,True
+CP-NODE-N09-N10,node_distance,,N09-N10,B-N09-N10,node_to_node_distance,235.0,mm,20.0,1250,350,50,50,0.95,NEEDS_CONFIRMATION,N9 - N10 = 23.5 cm,placeholder,,True
 CP-NODE-N11-N12,node_distance,,N11-N12,B-N11-N12,node_to_node_distance,605.0,mm,30.0,1550,350,50,50,0.95,NEEDS_CONFIRMATION,N11 - N12 = 60.5 cm,placeholder,,True
-CP-T01,terminal,T01,J01,B-J01-T01,branch_length,69.1,mm,20.0,130,272,45,45,0.95,CONFIRMED,J1 - T1 = 39 cm,detailed.md:27,27,False
-CP-T02,terminal,T02,J01,B-J01-T02,branch_length,30.8,mm,20.0,29,385,45,45,0.95,CONFIRMED,J1 - T2 = 46 cm,detailed.md:27,27,False
-CP-T03,terminal,T03,J01,B-J01-T03,branch_length,84.8,mm,20.0,356,533,45,45,0.95,CONFIRMED,J1 - T3 = 39 cm,factory_sheet,measurement_sheet.png:J1-T3,False
-CP-T04,terminal,T04,J01,B-J01-T04,branch_length,6.7,mm,20.0,424,409,45,45,0.95,CONFIRMED,J1 - T4 = 39 cm,detailed.md:27,27,False
-CP-T05,terminal,T05,J01,B-J01-T05,branch_length,6.5,mm,20.0,405,536,45,45,0.95,CONFIRMED,J1 - T5 = 39 cm,factory_sheet,measurement_sheet.png:J2-T5,False
-CP-T06,terminal,T06,J02,B-J02-T06,branch_length,33.3,mm,15.0,469,551,45,45,0.95,CONFIRMED,J2 - T6 = 20 cm,factory_sheet,measurement_sheet.png:J2-T6,False
-CP-T07,terminal,T07,J03,B-J03-T07,branch_length,27.8,mm,15.0,577,481,45,45,0.95,CONFIRMED,J3 - T7 = 18 cm,factory_sheet,measurement_sheet.png:J3-T7,False
-CP-T08,terminal,T08,J08,B-J08-T08,branch_length,35.0,mm,10.0,439,268,45,45,0.95,CONFIRMED,J8 - T8 = 7 cm,factory_sheet,measurement_sheet.png:J3-T8,False
+CP-T01,terminal,T01,J01,B-J01-T01,branch_length,390.0,mm,20.0,130,272,45,45,0.95,CONFIRMED,J1 - T1 = 39 cm,detailed.md:27,27,False
+CP-T02,terminal,T02,J01,B-J01-T02,branch_length,460.0,mm,20.0,29,385,45,45,0.95,CONFIRMED,J1 - T2 = 46 cm,detailed.md:27,27,False
+CP-T03,terminal,T03,J01,B-J01-T03,branch_length,390.0,mm,20.0,356,533,45,45,0.95,CONFIRMED,J1 - T3 = 39 cm,factory_sheet,1,False
+CP-T04,terminal,T04,J01,B-J01-T04,branch_length,390.0,mm,20.0,424,409,45,45,0.95,CONFIRMED,J1 - T4 = 39 cm,factory_sheet,2,False
+CP-T05,terminal,T05,J01,B-J01-T05,branch_length,390.0,mm,20.0,405,536,45,45,0.95,CONFIRMED,J1 - T5 = 39 cm,factory_sheet,3,False
+CP-T06,terminal,T06,J02,B-J02-T06,branch_length,200.0,mm,15.0,469,551,45,45,0.95,CONFIRMED,J2 - T6 = 20 cm,factory_sheet,4,False
+CP-T07,terminal,T07,J03,B-J03-T07,branch_length,180.0,mm,15.0,577,481,45,45,0.95,CONFIRMED,J3 - T7 = 18 cm,factory_sheet,5,False
+CP-T08,terminal,T08,J08,B-J08-T08,branch_length,70.0,mm,10.0,439,268,45,45,0.95,CONFIRMED,J8 - T8 = 7 cm,factory_sheet,6,False
 CP-T09,terminal,T09,J01,B-J01-T09,branch_length,150.0,mm,15.0,475,247,45,45,0.95,NEEDS_CONFIRMATION,Manually placed checkpoint,placeholder,,True
 CP-T10,terminal,T10,J01,B-J01-T10,branch_length,150.0,mm,15.0,530,177,45,45,0.95,NEEDS_CONFIRMATION,Manually placed checkpoint,placeholder,,True
 CP-T11,terminal,T11,J01,B-J01-T11,branch_length,150.0,mm,15.0,582,291,45,45,0.95,NEEDS_CONFIRMATION,Manually placed checkpoint,placeholder,,True
@@ -30,19 +30,19 @@ CP-T22,terminal,T22,J12,B-J12-T22,branch_length,100.0,mm,15.0,640,40,45,45,0.95,
 CP-T23,terminal,T23,J01,B-J01-T23,branch_length,150.0,mm,15.0,720,36,45,45,0.95,NEEDS_CONFIRMATION,Manually placed checkpoint,placeholder,,True
 CP-T24,terminal,T24,J01,B-J01-T24,branch_length,150.0,mm,15.0,908,494,45,45,0.95,NEEDS_CONFIRMATION,Manually placed checkpoint,placeholder,,True
 CP-T25,terminal,T25,J01,B-J01-T25,branch_length,150.0,mm,15.0,993,504,45,45,0.95,NEEDS_CONFIRMATION,Manually placed checkpoint,placeholder,,True
-CP-T26,terminal,T26,J24,B-J24-T26,branch_length,29.3,mm,20.0,1131,436,45,45,0.95,NEEDS_CONFIRMATION,J24 - T26 = 13 cm,placeholder,,True
-CP-T27,terminal,T27,J23,B-J23-T27,branch_length,30.2,mm,20.0,1064,285,45,45,0.95,NEEDS_CONFIRMATION,J23 - T27 = 19 cm,placeholder,,True
-CP-T28,terminal,T28,J21,B-J21-T28,branch_length,55.6,mm,20.0,1271,210,45,45,0.95,NEEDS_CONFIRMATION,J21 - T28 = 10 cm,placeholder,,True
-CP-T29,terminal,T29,J21,B-J21-T29,branch_length,15.0,mm,20.0,1118,269,45,45,0.95,NEEDS_CONFIRMATION,J21 - T29 = 16 cm,placeholder,,True
-CP-T30,terminal,T30,J24,B-J24-T30,branch_length,27.2,mm,20.0,227,161,45,45,0.95,NEEDS_CONFIRMATION,J24 - T30 = 44 cm,placeholder,,True
-CP-T31,terminal,T31,J21,B-J21-T31,branch_length,6.7,mm,20.0,1211,73,45,45,0.95,NEEDS_CONFIRMATION,J21 - T31 = 39 cm,placeholder,,True
-CP-T32,terminal,T32,J26,B-J26-T32,branch_length,6.7,mm,20.0,1254,56,45,45,0.95,NEEDS_CONFIRMATION,J26 - T32 = 18 cm,placeholder,,True
+CP-T26,terminal,T26,J24,B-J24-T26,branch_length,390.0,mm,20.0,1131,436,45,45,0.95,NEEDS_CONFIRMATION,J24 - T26 = 13 cm,placeholder,,True
+CP-T27,terminal,T27,J23,B-J23-T27,branch_length,390.0,mm,20.0,1064,285,45,45,0.95,NEEDS_CONFIRMATION,J23 - T27 = 19 cm,placeholder,,True
+CP-T28,terminal,T28,J21,B-J21-T28,branch_length,390.0,mm,20.0,1271,210,45,45,0.95,NEEDS_CONFIRMATION,J21 - T28 = 10 cm,placeholder,,True
+CP-T29,terminal,T29,J21,B-J21-T29,branch_length,390.0,mm,20.0,1118,269,45,45,0.95,NEEDS_CONFIRMATION,J21 - T29 = 16 cm,placeholder,,True
+CP-T30,terminal,T30,J24,B-J24-T30,branch_length,390.0,mm,20.0,227,161,45,45,0.95,NEEDS_CONFIRMATION,J24 - T30 = 44 cm,placeholder,,True
+CP-T31,terminal,T31,J21,B-J21-T31,branch_length,390.0,mm,20.0,1211,73,45,45,0.95,NEEDS_CONFIRMATION,J21 - T31 = 39 cm,placeholder,,True
+CP-T32,terminal,T32,J26,B-J26-T32,branch_length,390.0,mm,20.0,1254,56,45,45,0.95,NEEDS_CONFIRMATION,J26 - T32 = 18 cm,placeholder,,True
 CP-T33,terminal,T33,J26,B-J26-T33,branch_length,260.0,mm,20.0,1513,158,45,45,0.95,NEEDS_CONFIRMATION,J26 - T33 = 26 cm (reconciled missing terminal),placeholder,,True
-CP-T34,terminal,T34,J26,B-J26-T34,branch_length,13.4,mm,15.0,1672,86,45,45,0.95,NEEDS_CONFIRMATION,J26 - T34 = 20 cm,placeholder,,True
-CP-T35,terminal,T35,J27,B-J27-T35,branch_length,36.3,mm,20.0,1791,358,45,45,0.95,NEEDS_CONFIRMATION,J27 - T35 = 26 cm,placeholder,,True
+CP-T34,terminal,T34,J26,B-J26-T34,branch_length,200.0,mm,15.0,1672,86,45,45,0.95,NEEDS_CONFIRMATION,J26 - T34 = 20 cm,placeholder,,True
+CP-T35,terminal,T35,J27,B-J27-T35,branch_length,390.0,mm,20.0,1791,358,45,45,0.95,NEEDS_CONFIRMATION,J27 - T35 = 26 cm,placeholder,,True
 CP-T36,terminal,T36,J01,B-J01-T36,branch_length,150.0,mm,15.0,718,136,45,45,0.95,NEEDS_CONFIRMATION,Manually placed checkpoint,placeholder,,True
-CP-T37,terminal,T37,J29,B-J29-T37,branch_length,10.5,mm,20.0,780,160,45,45,0.95,NEEDS_CONFIRMATION,J29 - T37 = 12 cm,placeholder,,True
-CP-T38,terminal,T38,J28,B-J28-T38,branch_length,49.1,mm,20.0,850,180,45,45,0.95,NEEDS_CONFIRMATION,J28 - T38 = 69 cm,placeholder,,True
+CP-T37,terminal,T37,J29,B-J29-T37,branch_length,150.0,mm,20.0,780,160,45,45,0.95,NEEDS_CONFIRMATION,J29 - T37 = 12 cm,placeholder,,True
+CP-T38,terminal,T38,J28,B-J28-T38,branch_length,150.0,mm,20.0,850,180,45,45,0.95,NEEDS_CONFIRMATION,J28 - T38 = 69 cm,placeholder,,True
 CP-T39,terminal,T39,J28,B-J28-T39,branch_length,150.0,mm,20.0,880,190,45,45,0.95,NEEDS_CONFIRMATION,J28 - T39 = 15 cm,placeholder,,True
-CP-T40,terminal,T40,J31,B-J31-T40,branch_length,16.4,mm,20.0,920,200,45,45,0.95,NEEDS_CONFIRMATION,J31 - T40 = 23.5 cm,placeholder,,True
-CP-T41,terminal,T41,J31,B-J31-T41,branch_length,17.7,mm,20.0,950,210,45,45,0.95,NEEDS_CONFIRMATION,J31 - T41 = 31 cm,placeholder,,True
+CP-T40,terminal,T40,J31,B-J31-T40,branch_length,150.0,mm,20.0,920,200,45,45,0.95,NEEDS_CONFIRMATION,J31 - T40 = 23.5 cm,placeholder,,True
+CP-T41,terminal,T41,J31,B-J31-T41,branch_length,150.0,mm,20.0,950,210,45,45,0.95,NEEDS_CONFIRMATION,J31 - T41 = 31 cm,placeholder,,True

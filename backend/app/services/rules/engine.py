@@ -50,11 +50,15 @@ class RuleEngine:
         all_results: list[RuleResult] = []
 
         # 1. Pre-gate evaluation
+        msil_pack = self.loader.get_pack("msil_tolerances") or {}
+        min_align = float(msil_pack.get("quality_gates", {}).get("min_alignment_confidence", 0.85))
+
         pre_gate_results = evaluate_pre_gates(
             image=None,
             calibrated=context.vision.calibrated,
             pixels_per_mm=context.vision.pixels_per_mm,
             alignment_confidence=context.vision.alignment_confidence,
+            min_alignment=min_align,
             variant_selected=context.variant or context.part_no,
             image_quality=context.vision.image_quality,
         )
@@ -144,6 +148,8 @@ class RuleEngine:
         operator_input: OperatorInput | None = None,
         variant: str = "YH200502",
         part_no: str = "YH200502",
+        config: dict[str, Any] | None = None,
+        override_pixels_per_mm: float | None = None,
     ) -> HarnessVerdict:
         """Full pipeline: Ingest image -> Pre-gates -> Evidence extraction -> Rule packs -> Verdict."""
         # 1. Compute Image Hash
@@ -151,8 +157,14 @@ class RuleEngine:
         if image is not None and hasattr(image, "tobytes"):
             image_hash = hashlib.sha256(image.tobytes()).hexdigest()
 
+        golden_cfg = config if config is not None else golden_reference_service.get_configuration()
+
         # 2. Extract Calibration Evidence
-        calib_info = resolve_calibration(image)
+        calib_info = resolve_calibration(
+            image,
+            override_pixels_per_mm=override_pixels_per_mm,
+            config=golden_cfg,
+        )
         calibrated = calib_info.calibrated
         pixels_per_mm = calib_info.pixels_per_mm
         calib_prov = calib_info.provenance
@@ -161,10 +173,10 @@ class RuleEngine:
         inspection_out = golden_inspection_service.inspect_image(
             image,
             override_pixels_per_mm=pixels_per_mm if calibrated else None,
+            config=golden_cfg,
         )
         align_conf = getattr(inspection_out, "alignment_confidence", 1.0)
         
-        golden_cfg = golden_reference_service.get_configuration()
         ref_cp_map = {c.get("checkpoint_id"): c for c in golden_cfg.get("checkpoints", [])}
 
         # Checkpoints mapping

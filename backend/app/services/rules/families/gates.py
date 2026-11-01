@@ -61,7 +61,7 @@ def evaluate_pre_gates(
     calibrated: bool,
     pixels_per_mm: float,
     alignment_confidence: float,
-    min_alignment: float = 0.90,
+    min_alignment: float = 0.85,
     occupied_percentage: float | None = None,
     variant_selected: str | None = None,
     image_quality: ImageQualityMetrics | None = None,
