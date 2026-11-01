@@ -43,10 +43,17 @@ def board_crop_path() -> Path:
 @pytest.fixture
 def raw_sample_path() -> Path:
     # 459x1024 unaligned / portrait raw capture
-    p = Path("data/test_images/harness_sample_01.jpeg")
-    if not p.exists():
-        pytest.skip("459x1024 test image fixture not found")
-    return p
+    for p in [
+        Path("data/test_images/harness_sample_01_raw_459x1024.jpeg"),
+        Path("data/test_images/harness_sample_01_raw.jpeg"),
+        Path("data/test_images/harness_sample_01.jpeg"),
+    ]:
+        if p.exists():
+            from PIL import Image
+            with Image.open(p) as img:
+                if img.size == (459, 1024):
+                    return p
+    pytest.skip("459x1024 test image fixture not found")
 
 
 @pytest.fixture
