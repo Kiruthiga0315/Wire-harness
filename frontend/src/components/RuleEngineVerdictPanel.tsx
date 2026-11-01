@@ -9,19 +9,17 @@ import {
   Search,
   SlidersHorizontal,
   TriangleAlert,
+  X,
 } from 'lucide-react'
 import { useState } from 'react'
 import type {
   BranchTapingInput,
-  BranchType,
   CheckSheetEntry,
   CheckSheetItemState,
   FinalAssemblyCheckSheetInput,
   HarnessVerdict,
   OperatorInput,
   RuleResult,
-  RuleSeverity,
-  RuleStatus,
 } from '../types/rules'
 import { downloadVerdictCsv, downloadVerdictPdf, evaluateRules } from '../services/api'
 
@@ -55,6 +53,7 @@ export function RuleEngineVerdictPanel({
   const [evaluating, setEvaluating] = useState(false)
   const [evalError, setEvalError] = useState<string | null>(null)
   const [showOperatorForm, setShowOperatorForm] = useState(false)
+  const [localSelectedRule, setLocalSelectedRule] = useState<RuleResult | null>(null)
 
   // Filtering states
   const [familyFilter, setFamilyFilter] = useState<string>('all')
@@ -84,7 +83,7 @@ export function RuleEngineVerdictPanel({
   })
 
   // Branch Taping Inputs
-  const [tapingList, setTapingList] = useState<BranchTapingInput[]>([
+  const [tapingList] = useState<BranchTapingInput[]>([
     {
       branch_id: 'BR-01',
       branch_type: 'W',
@@ -221,58 +220,67 @@ export function RuleEngineVerdictPanel({
   const isReject = verdictType === 'REJECT'
   const isHold = verdictType === 'HOLD'
 
+  const activeSelectedRule =
+    verdict?.rule_results.find((r) => r.rule_id === selectedRuleId) || localSelectedRule
+
+  const handleRowClick = (rule: RuleResult) => {
+    setLocalSelectedRule(rule)
+    onSelectRule?.(rule)
+  }
+
   return (
-    <div className={`space-y-4 ${className}`}>
+    <div className={`rule-engine-container ${className}`}>
       {/* 1. Large Verdict Banner */}
       <div
-        className={`rounded-xl border p-5 shadow-sm transition-all ${
+        className={`rule-verdict-banner ${
           isAccept
-            ? 'border-emerald-600 bg-emerald-600 text-white'
+            ? 'rule-verdict-banner--accept'
             : isReject
-            ? 'border-rose-600 bg-rose-600 text-white'
-            : 'border-amber-500 bg-amber-500 text-slate-950'
+            ? 'rule-verdict-banner--reject'
+            : 'rule-verdict-banner--hold'
         }`}
       >
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div className="flex items-center gap-4">
-            <div className="rounded-lg bg-black/15 p-3">
-              {isAccept && <CheckCircle2 className="h-9 w-9 text-white" />}
-              {isReject && <CircleX className="h-9 w-9 text-white" />}
-              {isHold && <Clock3 className="h-9 w-9 text-slate-950" />}
+        <div className="rule-verdict-banner-inner">
+          <div className="rule-verdict-main">
+            <div className="rule-verdict-icon-box">
+              {isAccept && <CheckCircle2 size={32} color="#ffffff" />}
+              {isReject && <CircleX size={32} color="#ffffff" />}
+              {isHold && <Clock3 size={32} color="#ffffff" />}
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold uppercase tracking-wider opacity-85">
+              <div className="rule-verdict-tag-row">
+                <span className="rule-verdict-eyebrow">
                   Final Quality Verdict · {verdict?.variant || variant}
                 </span>
-                <span className="rounded bg-black/20 px-2 py-0.5 text-[11px] font-mono font-medium">
+                <span className="rule-verdict-pack-tag">
                   Pack v{verdict?.rule_pack_version || '1.0.0'}
                 </span>
               </div>
-              <h2 className="text-2xl font-black tracking-tight">
+              <h2 className="rule-verdict-title">
                 {isAccept && 'ACCEPT — CONFORMING HARNESS'}
                 {isReject && 'REJECT — NON-CONFORMANCE DETECTED'}
                 {isHold && 'HOLD — PENDING QUALITY INSPECTION / ATTESTATION'}
               </h2>
-              <p className="mt-0.5 text-xs font-medium opacity-90">
-                Provenance: {verdict?.calibration_provenance || 'uncalibrated'} ·{' '}
-                {verdict ? `${verdict.summary.PASS} PASS / ${verdict.summary.FAIL} FAIL / ${verdict.summary.REVIEW} REVIEW / ${verdict.summary.NOT_EVALUATED} HELD` : 'No evaluation executed yet'}
-              </p>
+              <div className="rule-verdict-provenance">
+                <span>Provenance: <strong>{verdict?.calibration_provenance || 'uncalibrated'}</strong></span>
+                {verdict && (
+                  <span className="rule-verdict-stats-badge">
+                    {verdict.summary.PASS} PASS / {verdict.summary.FAIL} FAIL / {verdict.summary.REVIEW} REVIEW / {verdict.summary.NOT_EVALUATED} HELD
+                  </span>
+                )}
+                {!verdict && <span>· No evaluation executed yet</span>}
+              </div>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="rule-verdict-actions">
             <button
               type="button"
               onClick={handleRunEvaluation}
               disabled={evaluating}
-              className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-bold shadow-sm transition ${
-                isAccept || isReject
-                  ? 'bg-white text-slate-900 hover:bg-slate-100'
-                  : 'bg-slate-900 text-white hover:bg-slate-800'
-              } disabled:opacity-50`}
+              className="rule-btn-evaluate"
             >
-              <Play className="h-4 w-4" />
+              <Play size={16} />
               {evaluating ? 'Evaluating...' : 'Evaluate Rules'}
             </button>
 
@@ -281,17 +289,17 @@ export function RuleEngineVerdictPanel({
                 <button
                   type="button"
                   onClick={() => downloadVerdictPdf(verdict.verdict_id)}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-white/30 bg-black/10 px-3 py-2 text-xs font-semibold backdrop-blur hover:bg-black/20"
+                  className="rule-btn-glass"
                 >
-                  <Download className="h-3.5 w-3.5" />
+                  <Download size={15} />
                   PDF Cert
                 </button>
                 <button
                   type="button"
                   onClick={() => downloadVerdictCsv(verdict.verdict_id)}
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-white/30 bg-black/10 px-3 py-2 text-xs font-semibold backdrop-blur hover:bg-black/20"
+                  className="rule-btn-glass"
                 >
-                  <FileChartColumn className="h-3.5 w-3.5" />
+                  <FileChartColumn size={15} />
                   CSV
                 </button>
               </>
@@ -300,9 +308,9 @@ export function RuleEngineVerdictPanel({
             <button
               type="button"
               onClick={() => setShowOperatorForm(!showOperatorForm)}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-white/30 bg-black/10 px-3 py-2 text-xs font-semibold hover:bg-black/20"
+              className="rule-btn-glass"
             >
-              <SlidersHorizontal className="h-3.5 w-3.5" />
+              <SlidersHorizontal size={15} />
               {showOperatorForm ? 'Hide Operator Inputs' : 'Operator Inputs'}
             </button>
           </div>
@@ -310,161 +318,164 @@ export function RuleEngineVerdictPanel({
 
         {/* Reaction Plan Alert on REJECT or HOLD */}
         {(isReject || isHold) && verdict?.reaction_plan && (
-          <div className="mt-4 rounded-lg bg-black/20 p-3 text-xs font-medium">
-            <div className="flex items-start gap-2">
-              <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-white" />
-              <div>
-                <span className="font-bold uppercase tracking-wider text-white">Factory Reaction Plan:</span>
-                <p className="mt-0.5 text-white/95">{verdict.reaction_plan}</p>
-              </div>
+          <div className="rule-reaction-plan-box">
+            <TriangleAlert size={19} color="#ffffff" style={{ flexShrink: 0, marginTop: '2px' }} />
+            <div className="rule-reaction-plan-content">
+              <strong>Factory Reaction Plan:</strong>
+              <p>{verdict.reaction_plan}</p>
             </div>
           </div>
         )}
       </div>
 
       {evalError && (
-        <div className="rounded-lg border border-rose-300 bg-rose-50 p-3 text-xs text-rose-800">
-          <b>Evaluation Error:</b> {evalError}
+        <div className="alert-banner" role="alert">
+          <TriangleAlert size={20} />
+          <div>
+            <strong>Evaluation Error</strong>
+            <span>{evalError}</span>
+          </div>
         </div>
       )}
 
       {/* 2. Operator Inputs Drawer / Form */}
       {showOperatorForm && (
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <div className="flex items-center justify-between border-b border-slate-200 pb-3 dark:border-slate-800">
-            <div className="flex items-center gap-2">
-              <ClipboardCheck className="h-5 w-5 text-sky-600" />
-              <h3 className="font-bold text-slate-900 dark:text-slate-100">
-                Operator Inspection Inputs (FRM/PR/19 rev 10 & BT45-02)
-              </h3>
+        <div className="panel rule-operator-panel">
+          <div className="panel-header">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <ClipboardCheck size={20} color="var(--blue-600)" />
+              <div>
+                <p className="eyebrow">QUALITY ATTESTATION & CHECK SHEET</p>
+                <h2 style={{ fontSize: '18px', margin: 0 }}>
+                  Operator Inspection Inputs (FRM/PR/19 rev 10 & BT45-02)
+                </h2>
+              </div>
             </div>
             <button
               type="button"
+              className="button button--ghost"
+              style={{ minHeight: '30px', padding: '0 10px', fontSize: '10px' }}
               onClick={() => setShowOperatorForm(false)}
-              className="text-xs font-medium text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
             >
-              Close
+              <X size={14} /> Close
             </button>
           </div>
 
-          <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-4">
-            <div>
-              <label className="block text-[11px] font-semibold uppercase text-slate-500">Shift</label>
+          <div className="rule-operator-grid">
+            <div className="rule-form-group">
+              <label className="rule-form-label">Shift</label>
               <select
                 value={shift}
                 onChange={(e) => setShift(e.target.value)}
-                className="mt-1 w-full rounded border border-slate-300 bg-white px-2.5 py-1.5 text-xs dark:border-slate-700 dark:bg-slate-800"
+                className="rule-form-select"
               >
                 <option value="A">Shift A (Morning)</option>
                 <option value="B">Shift B (Evening)</option>
                 <option value="C">Shift C (Night)</option>
               </select>
             </div>
-            <div>
-              <label className="block text-[11px] font-semibold uppercase text-slate-500">Associate Name</label>
+            <div className="rule-form-group">
+              <label className="rule-form-label">Associate Name</label>
               <input
                 type="text"
                 value={associateName}
                 onChange={(e) => setAssociateName(e.target.value)}
-                className="mt-1 w-full rounded border border-slate-300 px-2.5 py-1.5 text-xs dark:border-slate-700 dark:bg-slate-800"
+                className="rule-form-input"
               />
             </div>
-            <div>
-              <label className="block text-[11px] font-semibold uppercase text-slate-500">Employee E-Code</label>
+            <div className="rule-form-group">
+              <label className="rule-form-label">Employee E-Code</label>
               <input
                 type="text"
                 value={eCode}
                 onChange={(e) => setECode(e.target.value)}
-                className="mt-1 w-full rounded border border-slate-300 px-2.5 py-1.5 text-xs dark:border-slate-700 dark:bg-slate-800"
+                className="rule-form-input"
               />
             </div>
-            <div>
-              <label className="block text-[11px] font-semibold uppercase text-slate-500">Master Sample Status</label>
+            <div className="rule-form-group">
+              <label className="rule-form-label">Master Sample Status</label>
               <select
                 value={masterSampleStatus}
                 onChange={(e) => setMasterSampleStatus(e.target.value as 'OK' | 'NG' | 'EXPIRED')}
-                className="mt-1 w-full rounded border border-slate-300 bg-white px-2.5 py-1.5 text-xs dark:border-slate-700 dark:bg-slate-800"
+                className="rule-form-select"
               >
                 <option value="OK">OK (Validated Active)</option>
                 <option value="NG">NG (Non-conforming)</option>
                 <option value="EXPIRED">EXPIRED (Shift Expired)</option>
               </select>
             </div>
-          </div>
 
-          <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-4">
-            <div>
-              <label className="block text-[11px] font-semibold uppercase text-slate-500">Total Production Qty</label>
+            <div className="rule-form-group">
+              <label className="rule-form-label">Total Production Qty</label>
               <input
                 type="number"
                 value={totalQty}
                 onChange={(e) => setTotalQty(Number(e.target.value))}
-                className="mt-1 w-full rounded border border-slate-300 px-2.5 py-1.5 text-xs dark:border-slate-700 dark:bg-slate-800"
+                className="rule-form-input"
               />
             </div>
-            <div>
-              <label className="block text-[11px] font-semibold uppercase text-slate-500">Label Serial From</label>
+            <div className="rule-form-group">
+              <label className="rule-form-label">Label Serial From</label>
               <input
                 type="number"
                 value={serialFrom}
                 onChange={(e) => setSerialFrom(Number(e.target.value))}
-                className="mt-1 w-full rounded border border-slate-300 px-2.5 py-1.5 text-xs dark:border-slate-700 dark:bg-slate-800"
+                className="rule-form-input"
               />
             </div>
-            <div>
-              <label className="block text-[11px] font-semibold uppercase text-slate-500">Label Serial To</label>
+            <div className="rule-form-group">
+              <label className="rule-form-label">Label Serial To</label>
               <input
                 type="number"
                 value={serialTo}
                 onChange={(e) => setSerialTo(Number(e.target.value))}
-                className="mt-1 w-full rounded border border-slate-300 px-2.5 py-1.5 text-xs dark:border-slate-700 dark:bg-slate-800"
+                className="rule-form-input"
               />
             </div>
-            <div>
-              <label className="block text-[11px] font-semibold uppercase text-slate-500">Labels Scrapped</label>
+            <div className="rule-form-group">
+              <label className="rule-form-label">Labels Scrapped</label>
               <input
                 type="number"
                 value={serialScrapped}
                 onChange={(e) => setSerialScrapped(Number(e.target.value))}
-                className="mt-1 w-full rounded border border-slate-300 px-2.5 py-1.5 text-xs dark:border-slate-700 dark:bg-slate-800"
+                className="rule-form-input"
               />
             </div>
           </div>
 
           {/* 9 Check Sheet Items */}
-          <div className="mt-5">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
-              FRM/PR/19 Check Items (9 Checks x 2 Pieces)
-            </h4>
-            <div className="mt-2 divide-y divide-slate-100 overflow-x-auto rounded border border-slate-200 dark:divide-slate-800 dark:border-slate-800">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 text-[11px] font-bold uppercase text-slate-500 dark:bg-slate-800/60 dark:text-slate-400">
+          <div className="rule-checksheet-section">
+            <div className="rule-checksheet-header">
+              <span>FRM/PR/19 Check Items (9 Checks × 2 Pieces)</span>
+              <small style={{ color: 'var(--slate-500)', fontSize: '11px', fontWeight: 600 }}>
+                Shift First & Last Piece Inspection Log
+              </small>
+            </div>
+            <div className="table-wrap" style={{ background: '#ffffff', borderRadius: '4px', border: '1px solid var(--slate-200)' }}>
+              <table>
+                <thead>
                   <tr>
-                    <th className="p-2.5">Check Item</th>
-                    <th className="p-2.5">Severity</th>
-                    <th className="p-2.5">First Piece</th>
-                    <th className="p-2.5">Last Piece</th>
-                    <th className="p-2.5">Notes</th>
+                    <th style={{ width: '28%' }}>Check Item</th>
+                    <th style={{ width: '12%' }}>Severity</th>
+                    <th style={{ width: '15%' }}>First Piece</th>
+                    <th style={{ width: '15%' }}>Last Piece</th>
+                    <th>Operator Notes</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                <tbody>
                   {DEFAULT_CHECK_ITEMS.map((item) => {
                     const entry = checks[item.id] || { first_piece: 'OK', last_piece: 'OK', notes: '' }
                     return (
-                      <tr key={item.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
-                        <td className="p-2.5 font-medium text-slate-900 dark:text-slate-100">{item.name}</td>
-                        <td className="p-2.5">
+                      <tr key={item.id}>
+                        <td><strong>{item.name}</strong></td>
+                        <td>
                           <span
-                            className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${
-                              item.severity === 'CRITICAL'
-                                ? 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300'
-                                : 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
-                            }`}
+                            className={`rule-severity-tag rule-severity-tag--${item.severity.toLowerCase()}`}
                           >
                             {item.severity}
                           </span>
                         </td>
-                        <td className="p-2.5">
+                        <td>
                           <select
                             value={entry.first_piece}
                             onChange={(e) =>
@@ -473,14 +484,15 @@ export function RuleEngineVerdictPanel({
                                 [item.id]: { ...entry, first_piece: e.target.value as CheckSheetItemState },
                               }))
                             }
-                            className="rounded border border-slate-300 bg-white px-2 py-1 text-xs dark:border-slate-700 dark:bg-slate-800"
+                            className="rule-form-select"
+                            style={{ height: '30px', fontSize: '10px' }}
                           >
                             <option value="OK">OK</option>
                             <option value="NG">NG</option>
                             <option value="CORRECTED">CORRECTED</option>
                           </select>
                         </td>
-                        <td className="p-2.5">
+                        <td>
                           <select
                             value={entry.last_piece}
                             onChange={(e) =>
@@ -489,14 +501,15 @@ export function RuleEngineVerdictPanel({
                                 [item.id]: { ...entry, last_piece: e.target.value as CheckSheetItemState },
                               }))
                             }
-                            className="rounded border border-slate-300 bg-white px-2 py-1 text-xs dark:border-slate-700 dark:bg-slate-800"
+                            className="rule-form-select"
+                            style={{ height: '30px', fontSize: '10px' }}
                           >
                             <option value="OK">OK</option>
                             <option value="NG">NG</option>
                             <option value="CORRECTED">CORRECTED</option>
                           </select>
                         </td>
-                        <td className="p-2.5">
+                        <td>
                           <input
                             type="text"
                             placeholder="Optional notes"
@@ -507,7 +520,8 @@ export function RuleEngineVerdictPanel({
                                 [item.id]: { ...entry, notes: e.target.value },
                               }))
                             }
-                            className="w-full rounded border border-slate-300 px-2 py-1 text-xs dark:border-slate-700 dark:bg-slate-800"
+                            className="rule-form-input"
+                            style={{ height: '30px', fontSize: '11px' }}
                           />
                         </td>
                       </tr>
@@ -521,32 +535,31 @@ export function RuleEngineVerdictPanel({
       )}
 
       {/* 3. Filterable Rule Results Table */}
-      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div className="flex items-center gap-2">
-            <SlidersHorizontal className="h-4 w-4 text-slate-500" />
-            <h3 className="font-bold text-slate-900 dark:text-slate-100">
+      <div className="panel">
+        <div className="panel-header">
+          <div>
+            <p className="eyebrow">DETERMINISTIC QA VERIFICATION</p>
+            <h2 style={{ fontSize: '18px', margin: 0 }}>
               Deterministic Rule Results ({filteredRules.length} of {verdict?.rule_results.length || 0})
-            </h3>
+            </h2>
           </div>
 
           {/* Filters Bar */}
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="relative">
-              <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
+          <div className="rule-filter-bar">
+            <div className="rule-search-box">
+              <Search size={14} color="var(--slate-500)" />
               <input
                 type="text"
                 placeholder="Search rule..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="rounded-lg border border-slate-300 bg-white py-1.5 pl-8 pr-3 text-xs dark:border-slate-700 dark:bg-slate-800"
               />
             </div>
 
             <select
               value={familyFilter}
               onChange={(e) => setFamilyFilter(e.target.value)}
-              className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs dark:border-slate-700 dark:bg-slate-800"
+              className="rule-filter-select"
             >
               <option value="all">All Families</option>
               <option value="msil_tolerances">MSIL Tolerances</option>
@@ -560,7 +573,7 @@ export function RuleEngineVerdictPanel({
             <select
               value={severityFilter}
               onChange={(e) => setSeverityFilter(e.target.value)}
-              className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs dark:border-slate-700 dark:bg-slate-800"
+              className="rule-filter-select"
             >
               <option value="all">All Severities</option>
               <option value="CRITICAL">CRITICAL</option>
@@ -571,7 +584,7 @@ export function RuleEngineVerdictPanel({
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs dark:border-slate-700 dark:bg-slate-800"
+              className="rule-filter-select"
             >
               <option value="all">All Statuses</option>
               <option value="PASS">PASS</option>
@@ -582,92 +595,168 @@ export function RuleEngineVerdictPanel({
           </div>
         </div>
 
+        {/* Selected Rule Detail Card (Expanded view on selection) */}
+        {activeSelectedRule && (
+          <div className="rule-detail-card">
+            <header>
+              <div>
+                <span className="eyebrow" style={{ color: 'var(--blue-600)' }}>SELECTED RULE SPECIFICATION</span>
+                <h4>
+                  {activeSelectedRule.rule_id} — {activeSelectedRule.name}
+                </h4>
+              </div>
+              <button
+                type="button"
+                className="button button--ghost"
+                style={{ minHeight: '26px', padding: '0 8px', fontSize: '10px' }}
+                onClick={() => {
+                  setLocalSelectedRule(null)
+                  onSelectRule?.(null)
+                }}
+              >
+                <X size={13} /> Close
+              </button>
+            </header>
+
+            <div className="rule-detail-grid">
+              <div className="rule-detail-stat">
+                <span>Rule Family</span>
+                <strong>{activeSelectedRule.family}</strong>
+              </div>
+              <div className="rule-detail-stat">
+                <span>Status</span>
+                <strong
+                  className={`rule-status-badge rule-status-badge--${activeSelectedRule.status.toLowerCase().replace('_', '-')}`}
+                >
+                  {activeSelectedRule.status}
+                </strong>
+              </div>
+              <div className="rule-detail-stat">
+                <span>Severity</span>
+                <strong
+                  className={`rule-severity-tag rule-severity-tag--${activeSelectedRule.severity.toLowerCase()}`}
+                >
+                  {activeSelectedRule.severity}
+                </strong>
+              </div>
+              <div className="rule-detail-stat">
+                <span>Nominal Tolerance</span>
+                <strong>{activeSelectedRule.tolerance !== null && activeSelectedRule.tolerance !== undefined ? String(activeSelectedRule.tolerance) : '—'}</strong>
+              </div>
+              <div className="rule-detail-stat">
+                <span>Expected Value</span>
+                <strong>{activeSelectedRule.expected !== null && activeSelectedRule.expected !== undefined ? `${activeSelectedRule.expected} mm` : '—'}</strong>
+              </div>
+              <div className="rule-detail-stat">
+                <span>Actual Measured</span>
+                <strong>{activeSelectedRule.actual !== null && activeSelectedRule.actual !== undefined ? `${activeSelectedRule.actual} mm` : '—'}</strong>
+              </div>
+              <div className="rule-detail-stat">
+                <span>Deviation</span>
+                <strong>{activeSelectedRule.deviation !== null && activeSelectedRule.deviation !== undefined ? `${typeof activeSelectedRule.deviation === 'number' && activeSelectedRule.deviation > 0 ? '+' : ''}${activeSelectedRule.deviation} mm` : '—'}</strong>
+              </div>
+              <div className="rule-detail-stat">
+                <span>Source Standard</span>
+                <strong>{activeSelectedRule.source_doc}</strong>
+              </div>
+            </div>
+
+            <div className="rule-detail-reason">
+              <strong>Evaluation Result: </strong>{activeSelectedRule.reason}
+              {activeSelectedRule.reaction_plan && (
+                <div style={{ marginTop: '6px', color: 'var(--red-600)', fontWeight: 600 }}>
+                  Reaction Plan: {activeSelectedRule.reaction_plan}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Table */}
-        <div className="mt-4 overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-800">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-slate-50 text-[11px] font-bold uppercase text-slate-500 dark:bg-slate-800/60 dark:text-slate-400">
+        <div className="rule-table-wrap">
+          <table>
+            <thead>
               <tr>
-                <th className="p-3">Status</th>
-                <th className="p-3">Rule ID</th>
-                <th className="p-3">Family</th>
-                <th className="p-3">Severity</th>
-                <th className="p-3">Expected</th>
-                <th className="p-3">Actual / Dev</th>
-                <th className="p-3">Reason / Details</th>
+                <th style={{ width: '110px' }}>Status</th>
+                <th style={{ width: '140px' }}>Rule ID</th>
+                <th style={{ width: '140px' }}>Family</th>
+                <th style={{ width: '90px' }}>Severity</th>
+                <th style={{ width: '100px' }}>Expected</th>
+                <th style={{ width: '110px' }}>Actual / Dev</th>
+                <th>Reason / Standard Compliance</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+            <tbody>
               {filteredRules.map((rule) => {
-                const isSelected = selectedRuleId === rule.rule_id
+                const isSelected = activeSelectedRule?.rule_id === rule.rule_id
                 const isFail = rule.status === 'FAIL'
                 const isReview = rule.status === 'REVIEW'
-                const isPass = rule.status === 'PASS'
 
                 return (
                   <tr
                     key={rule.rule_id}
-                    onClick={() => onSelectRule?.(rule)}
-                    className={`cursor-pointer transition-colors ${
+                    onClick={() => handleRowClick(rule)}
+                    className={`rule-table-row ${
                       isSelected
-                        ? 'bg-sky-50 dark:bg-sky-950/40'
+                        ? 'rule-table-row--selected'
                         : isFail
-                        ? 'bg-rose-50/40 hover:bg-rose-50/70 dark:bg-rose-950/20'
+                        ? 'rule-table-row--fail'
                         : isReview
-                        ? 'bg-amber-50/40 hover:bg-amber-50/70 dark:bg-amber-950/20'
-                        : 'hover:bg-slate-50/80 dark:hover:bg-slate-800/40'
+                        ? 'rule-table-row--review'
+                        : ''
                     }`}
                   >
-                    <td className="p-3">
+                    <td>
                       <span
-                        className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-bold ${
-                          isPass
-                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
-                            : isFail
-                            ? 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300'
-                            : isReview
-                            ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
-                            : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
-                        }`}
+                        className={`rule-status-badge rule-status-badge--${rule.status.toLowerCase().replace('_', '-')}`}
                       >
                         {rule.status}
                       </span>
                     </td>
-                    <td className="p-3 font-mono font-bold text-slate-900 dark:text-slate-100">
-                      {rule.rule_id}
+                    <td>
+                      <strong style={{ fontFamily: 'Consolas, monospace', fontSize: '11px', color: 'var(--navy-900)' }}>
+                        {rule.rule_id}
+                      </strong>
                     </td>
-                    <td className="p-3 text-slate-600 dark:text-slate-300">{rule.family}</td>
-                    <td className="p-3">
+                    <td>
+                      <span style={{ color: 'var(--slate-500)', fontSize: '11px' }}>
+                        {rule.family}
+                      </span>
+                    </td>
+                    <td>
                       <span
-                        className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${
-                          rule.severity === 'CRITICAL'
-                            ? 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300'
-                            : rule.severity === 'MAJOR'
-                            ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
-                            : 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300'
-                        }`}
+                        className={`rule-severity-tag rule-severity-tag--${rule.severity.toLowerCase()}`}
                       >
                         {rule.severity}
                       </span>
                     </td>
-                    <td className="p-3 font-mono text-[11px] text-slate-600 dark:text-slate-400">
-                      {rule.expected !== null && rule.expected !== undefined ? String(rule.expected) : '—'}
+                    <td>
+                      <span style={{ fontFamily: 'Consolas, monospace', fontSize: '11px', color: 'var(--slate-700)' }}>
+                        {rule.expected !== null && rule.expected !== undefined ? String(rule.expected) : '—'}
+                      </span>
                     </td>
-                    <td className="p-3 font-mono text-[11px]">
-                      {rule.actual !== null && rule.actual !== undefined ? String(rule.actual) : '—'}
+                    <td>
+                      <span style={{ fontFamily: 'Consolas, monospace', fontSize: '11px', fontWeight: 600, color: 'var(--navy-900)' }}>
+                        {rule.actual !== null && rule.actual !== undefined ? String(rule.actual) : '—'}
+                      </span>
                       {rule.deviation !== null && rule.deviation !== undefined && (
-                        <span className="ml-1 text-slate-400">({String(rule.deviation)})</span>
+                        <span style={{ marginLeft: '4px', color: 'var(--slate-500)', fontSize: '10px' }}>
+                          ({typeof rule.deviation === 'number' && rule.deviation > 0 ? '+' : ''}{String(rule.deviation)})
+                        </span>
                       )}
                     </td>
-                    <td className="p-3 text-slate-700 dark:text-slate-300">
-                      <p className="line-clamp-2">{rule.reason}</p>
+                    <td>
+                      <span style={{ color: 'var(--slate-700)', fontSize: '11px', lineHeight: 1.4 }}>
+                        {rule.reason}
+                      </span>
                     </td>
                   </tr>
                 )
               })}
               {filteredRules.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="p-6 text-center text-slate-400">
-                    No rules match current filters.
+                  <td colSpan={7} style={{ padding: '36px', textAlign: 'center', color: 'var(--slate-500)' }}>
+                    No rules match the current filters. Click "Evaluate Rules" above to generate a deterministic evaluation.
                   </td>
                 </tr>
               )}
