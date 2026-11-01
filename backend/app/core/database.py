@@ -52,7 +52,7 @@ def check_database_connection() -> tuple[bool, str]:
 
 
 def initialize_database() -> None:
-    from app.models import Checkpoint, ProductModel, RuleVerdictRecord  # noqa: F401
+    from app.models import Checkpoint, ProductModel  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
 

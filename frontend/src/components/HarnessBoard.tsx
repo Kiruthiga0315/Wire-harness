@@ -226,6 +226,7 @@ export function HarnessBoard({
           )}
         </div>
       </div>
+      <div className="mock-watermark">DEVELOPMENT CAMERA VIEW</div>
     </div>
   )
 }

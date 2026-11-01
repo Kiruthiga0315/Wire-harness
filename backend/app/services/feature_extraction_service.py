@@ -27,6 +27,7 @@ from app.schemas.feature_extraction import (
     JunctionCandidate,
     MainHarnessContour,
     PairwiseDistance,
+    QualityControlSummary,
     SkeletonFeatures,
 )
 from app.services.harness_graph_service import (
@@ -41,15 +42,30 @@ from app.services.harness_segmentation_service import (
     HarnessSegmentationService,
     ImageArray,
 )
+from app.services.image_preprocessing_service import (
+    ImagePreprocessingService,
+    image_preprocessing_service,
+)
 
 
-def _encode_png_base64(image: ImageArray) -> str:
-    """Encode an OpenCV BGR or grayscale image to a PNG data URL."""
-    encoded, buf = cv2.imencode(".png", image)
+def _encode_image_base64(image: ImageArray, is_mask: bool = False) -> str:
+    """Encode an OpenCV image to base64.
+
+    Uses PNG for 1-bit binary masks to preserve exact pixel values,
+    and high-quality JPEG (85) for color diagnostic visualizations to maintain
+    crisp visual inspection quality while keeping JSON payloads compact (< 1.5MB).
+    """
+    if is_mask or image.ndim == 2:
+        encoded, buf = cv2.imencode(".png", image)
+        mime = "image/png"
+    else:
+        encoded, buf = cv2.imencode(".jpg", image, [int(cv2.IMWRITE_JPEG_QUALITY), 85])
+        mime = "image/jpeg"
+
     if not encoded:
-        raise RuntimeError("Failed to encode image to PNG")
+        raise RuntimeError("Failed to encode image to base64")
     b64 = base64.b64encode(buf.tobytes()).decode("ascii")
-    return f"data:image/png;base64,{b64}"
+    return f"data:{mime};base64,{b64}"
 
 
 @dataclass(slots=True)
@@ -80,20 +96,24 @@ class OrderedBranchPath:
     orientation_deg: float
     mean_curvature: float
     max_bend_angle_deg: float
+    estimated_width_px: float
     compact_path: list[list[int]]
 
 
 class FeatureExtractionService:
-    """Comprehensive Feature Extraction Module for AI Wire Harness Inspection.
+    """Universal Feature Extraction Module for AI Wire Harness Inspection.
 
     Extracts:
-    1. Edge extraction (Canny edges, harness boundary gating, background edge suppression).
-    2. Contour extraction (external/internal contours, hierarchy, main harness contour, geometric shape properties).
-    3. Skeleton & Centerline extraction (1-px skeleton, ordered paths, crossing vs. joint discrimination).
-    4. Geometric feature extraction (angles, distances, curvature, bend angles, straightness).
-    5. Wire & branch features (ordered coordinates, tangent vectors, lengths in pixels).
-    6. Terminal and Joint candidate support (shape descriptors and ROIs for Part Identification).
-    7. Multi-layer visualizations (Original, Edges, Contours, Skeleton, Nodes, Combined Overlay).
+    1. Automatic non-destructive image preprocessing and quality gating.
+    2. Edge extraction (Canny edges, harness boundary gating, background edge suppression).
+    3. Contour extraction (external/internal contours, hierarchy, main harness contour, geometric shape properties).
+    4. Skeleton & Centerline extraction (1-px skeleton, ordered paths, crossing vs. joint discrimination).
+    5. Wire width estimation using Euclidean distance transform along branches.
+    6. Geometric feature extraction (angles, distances, curvature, bend angles, straightness).
+    7. Wire & branch features (ordered coordinates, tangent vectors, lengths in pixels).
+    8. Terminal and Joint candidate support (shape descriptors and ROIs for Part Identification).
+    9. 10 Diagnostic Engineering View Visualizations.
+    10. Quality Control summary with PASS / REVIEW / REJECT statuses and explanations.
     """
 
     def __init__(
@@ -101,9 +121,11 @@ class FeatureExtractionService:
         *,
         segmentation_service: HarnessSegmentationService | None = None,
         graph_service: HarnessGraphService | None = None,
+        preprocessing_service: ImagePreprocessingService | None = None,
     ) -> None:
         self.segmentation_service = segmentation_service or HarnessSegmentationService()
         self.graph_service = graph_service or HarnessGraphService()
+        self.preprocessing_service = preprocessing_service or image_preprocessing_service
 
     def extract_features(
         self,
@@ -112,97 +134,149 @@ class FeatureExtractionService:
         mask: ImageArray | None = None,
         config: FeatureExtractionRequest | None = None,
     ) -> FeatureExtractionResponse:
-        """Run the end-to-end feature extraction pipeline on an input image."""
+        """Run the universal end-to-end feature extraction pipeline on an input image."""
         started_time = time.perf_counter()
         warnings: list[str] = []
         errors: list[str] = []
+        review_reasons: list[str] = []
 
         self._validate_input_image(image)
-        h, w = image.shape[:2]
-        channels = image.shape[2] if image.ndim == 3 else 1
-        dimensions = ImageDimensions(width=w, height=h, channels=channels)
-
         cfg = config or FeatureExtractionRequest()
 
-        # Step A: Segmentation Mask (reuse existing HarnessSegmentationService if not supplied)
+        # Step 1: Automatic Preprocessing & Quality Assessment
+        prep_result = self.preprocessing_service.preprocess(image)
+        preprocessed_img = prep_result.preprocessed_image
+        h, w = preprocessed_img.shape[:2]
+        channels = preprocessed_img.shape[2] if preprocessed_img.ndim == 3 else 1
+        dimensions = ImageDimensions(width=w, height=h, channels=channels)
+
+        if prep_result.quality_metrics.quality_notes:
+            warnings.extend(prep_result.quality_metrics.quality_notes)
+        if prep_result.quality_metrics.quality_status == "REJECT":
+            review_reasons.extend(prep_result.quality_metrics.quality_notes)
+        elif prep_result.quality_metrics.quality_status == "REVIEW":
+            review_reasons.extend(prep_result.quality_metrics.quality_notes)
+
+        # Step 2: Harness Segmentation
         seg_result: HarnessSegmentationResult | None = None
         if mask is None:
             try:
-                seg_result = self.segmentation_service.segment(image)
+                seg_result = self.segmentation_service.segment(preprocessed_img)
                 binary_mask = seg_result.binary_mask
             except Exception as exc:
                 errors.append(f"Segmentation failed: {exc}")
                 binary_mask = np.zeros((h, w), dtype=np.uint8)
         else:
             if mask.shape[:2] != (h, w):
-                raise ValueError("Provided binary mask dimensions do not match the input image")
+                # Resize provided mask to match preprocessed dimensions if rotated
+                mask = cv2.resize(mask, (w, h), interpolation=cv2.INTER_NEAREST)
             binary_mask = (mask > 0).astype(np.uint8) * 255
 
-        # Step B: Edge Extraction (Canny + Mask-Gated Background Filtering)
+        # Check mask occupancy
+        occupied_ratio = float(cv2.countNonZero(binary_mask)) / float(max(1, h * w))
+        if occupied_ratio < 0.005:
+            errors.append("No wire harness structures detected in segmentation mask.")
+            review_reasons.append("Segmentation mask contains < 0.5% harness pixels")
+
+        # Step 3: Edge Extraction (Canny + Mask-Gated Background Filtering)
         edge_data = self._extract_edges(
-            image,
+            preprocessed_img,
             binary_mask,
             low_thresh=cfg.canny_low_threshold,
             high_thresh=cfg.canny_high_threshold,
         )
 
-        # Step C: Contour Extraction & Hierarchy
+        # Step 4: Contour Extraction & Hierarchy
         contour_data = self._extract_contours(
             binary_mask,
             min_area=cfg.min_contour_area,
         )
 
-        # Step D: Skeleton, Centerline Paths & Topology (reusing HarnessGraphService primitives)
+        # Step 5: Skeleton, Centerline Paths & Topology
         skeleton_bool = skeletonize(binary_mask > 0)
         skeleton_img = (skeleton_bool.astype(np.uint8)) * 255
-        graph_result = self.graph_service.analyse(binary_mask, base_image=image)
+        graph_result = self.graph_service.analyse(binary_mask, base_image=preprocessed_img)
+
+        # Distance transform for wire width estimation
+        dist_transform = cv2.distanceTransform(binary_mask, cv2.DIST_L2, 5)
 
         ordered_branches = self._trace_branch_paths(
             skeleton_bool,
             graph_result.nodes,
             graph_result.branches,
+            dist_transform=dist_transform,
             curvature_window=cfg.curvature_window,
         )
 
-        # Step E: Crossing vs. Electrical Joint Discrimination
+        # Step 6: Crossing vs. Electrical Joint Discrimination
         junction_candidates = self._classify_junctions(
             graph_result.nodes,
             ordered_branches,
         )
 
-        # Step F: Endpoint Candidates & Tangent Angles
+        uncertain_junctions = [j for j in junction_candidates if j.is_uncertain]
+        if uncertain_junctions:
+            review_reasons.append(
+                f"{len(uncertain_junctions)} wire junction(s) exhibit complex/ambiguous branching requiring operator review"
+            )
+
+        # Step 7: Endpoint Candidates & Tangent Angles
         endpoint_candidates = self._extract_endpoints_with_tangents(
             graph_result.nodes,
             ordered_branches,
         )
 
-        # Step G: Candidate Regions for Part Identification Module
+        # Step 8: Candidate Regions for Part Identification Module
         candidate_rois = self._extract_candidate_rois_for_part_id(
-            image,
+            preprocessed_img,
             binary_mask,
             endpoint_candidates,
             junction_candidates,
         )
 
-        # Step H: Geometric Features Aggregation
+        # Step 9: Geometric Features Aggregation
         geometric_features = self._calculate_geometric_features(
             endpoint_candidates,
             junction_candidates,
             ordered_branches,
         )
 
+        # Quality Control Status Evaluation
+        seg_conf = seg_result.segmentation_confidence if seg_result else 0.85
+        if prep_result.quality_metrics.quality_status == "REJECT" or occupied_ratio < 0.005:
+            qc_status = "REJECT"
+        elif prep_result.quality_metrics.quality_status == "REVIEW" or len(uncertain_junctions) > 0 or seg_conf < 0.70:
+            qc_status = "REVIEW"
+        else:
+            qc_status = "PASS"
+
+        qc_summary = QualityControlSummary(
+            quality_status=qc_status,
+            segmentation_confidence=round(seg_conf, 2),
+            image_quality_status=prep_result.quality_metrics.quality_status,
+            detected_components_count=contour_data.contours_info.total_contours,
+            endpoints_count=len(endpoint_candidates),
+            junction_candidates_count=len(junction_candidates),
+            branches_count=len(ordered_branches),
+            uncertain_junctions_count=len(uncertain_junctions),
+            extraction_warnings=warnings,
+            reasons_for_review_or_reject=review_reasons,
+        )
+
         # Always clearly identify uncalibrated values
         warnings.append(
-            "Every dimensional measurement (lengths, areas, perimeters) is reported in UNCALIBRATED PIXELS. "
+            "Every dimensional measurement (lengths, areas, perimeters, wire widths) is reported in UNCALIBRATED PIXELS. "
             "Downstream length measurement must apply optical scale (px/cm or px/mm) calibration."
         )
 
-        # Step I: Multi-Layer Visualizations
+        # Step 10: 10 Diagnostic Engineering Visualizations
         visualizations: FeatureVisualizations | None = None
         if cfg.generate_visualizations:
             visualizations = self._generate_visualizations(
                 image,
+                preprocessed_img,
                 binary_mask,
+                seg_result.isolated_harness_image if seg_result and seg_result.isolated_harness_image is not None else None,
                 edge_data,
                 contour_data,
                 skeleton_img,
@@ -223,6 +297,7 @@ class FeatureExtractionService:
                 orientation_deg=round(b.orientation_deg, 2),
                 mean_curvature=round(b.mean_curvature, 5),
                 max_bend_angle_deg=round(b.max_bend_angle_deg, 2),
+                estimated_width_pixels=round(b.estimated_width_px, 2),
                 compact_path=b.compact_path,
             )
             for b in ordered_branches
@@ -238,6 +313,7 @@ class FeatureExtractionService:
         )
 
         elapsed_ms = (time.perf_counter() - started_time) * 1000.0
+        model_status_str = seg_result.model_status if seg_result else "HYBRID_CV_PIPELINE"
 
         return FeatureExtractionResponse(
             image_dimensions=dimensions,
@@ -247,6 +323,8 @@ class FeatureExtractionService:
             candidate_regions_for_part_id=candidate_rois,
             geometric_features=geometric_features,
             visualizations=visualizations,
+            quality_control=qc_summary,
+            model_status=model_status_str,
             processing_time_ms=round(elapsed_ms, 2),
             warnings=warnings,
             errors=errors,
@@ -313,7 +391,6 @@ class FeatureExtractionService:
         min_area: float = 30.0,
     ) -> RawContourFeatures:
         """Extract external and internal contours, calculate shape descriptors, identify main harness."""
-        # RETR_CCOMP retrieves a two-level hierarchy: external boundaries and holes/internal contours
         contours, hierarchy = cv2.findContours(mask, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_NONE)
 
         descriptors: list[ContourDescriptor] = []
@@ -339,7 +416,6 @@ class FeatureExtractionService:
                 hull_area = float(cv2.contourArea(hull))
                 solidity = round(area / hull_area, 3) if hull_area > 0 else 0.0
 
-                # In cv2.RETR_CCOMP: hierarchy[i][3] == -1 indicates an external contour
                 parent_idx = int(h_data[idx][3])
                 is_internal = parent_idx != -1
                 if is_internal:
@@ -360,41 +436,37 @@ class FeatureExtractionService:
                         solidity=solidity,
                         extent=extent,
                         is_internal=is_internal,
-                        hierarchy_level=2 if is_internal else 1,
+                        hierarchy_level=1 if is_internal else 0,
                     )
                 )
 
-        main_contour_info: MainHarnessContour | None = None
+        main_harness_desc: MainHarnessContour | None = None
         if main_contour_idx is not None:
             mc = contours[main_contour_idx]
-            mc_area = float(cv2.contourArea(mc))
-            mc_perim = float(cv2.arcLength(mc, True))
             bx, by, bw, bh = cv2.boundingRect(mc)
-            mc_hull = cv2.convexHull(mc)
-            mc_hull_area = float(cv2.contourArea(mc_hull))
-            mc_solidity = round(mc_area / mc_hull_area, 3) if mc_hull_area > 0 else 0.0
-            mc_extent = round(mc_area / float(bw * bh), 3) if (bw * bh) > 0 else 0.0
             moments = cv2.moments(mc)
-            cx = round(moments["m10"] / moments["m00"], 1) if moments["m00"] != 0 else float(bx + bw / 2)
-            cy = round(moments["m01"] / moments["m00"], 1) if moments["m00"] != 0 else float(by + bh / 2)
-
-            main_contour_info = MainHarnessContour(
-                area=round(mc_area, 2),
-                perimeter=round(mc_perim, 2),
+            cx = float(moments["m10"] / moments["m00"]) if moments["m00"] != 0 else float(bx + bw / 2)
+            cy = float(moments["m01"] / moments["m00"]) if moments["m00"] != 0 else float(by + bh / 2)
+            hull = cv2.convexHull(mc)
+            hull_area = float(cv2.contourArea(hull))
+            sol = round(max_area / hull_area, 3) if hull_area > 0 else 0.0
+            main_harness_desc = MainHarnessContour(
+                area=round(max_area, 2),
+                perimeter=round(float(cv2.arcLength(mc, True)), 2),
                 bounding_box=BoundingBox(x=bx, y=by, width=bw, height=bh),
                 aspect_ratio=round(float(bw) / float(bh), 3) if bh > 0 else 0.0,
-                solidity=mc_solidity,
-                extent=mc_extent,
-                center_x=cx,
-                center_y=cy,
+                solidity=sol,
+                extent=round(max_area / float(bw * bh), 3) if bw * bh > 0 else 0.0,
+                center_x=round(cx, 1),
+                center_y=round(cy, 1),
             )
 
         info = ContourInformation(
             total_contours=len(descriptors),
             external_contours_count=external_count,
             internal_contours_count=internal_count,
-            main_harness_contour=main_contour_info,
-            significant_contours=descriptors[:50],  # Keep top 50 in payload to prevent bloating
+            main_harness_contour=main_harness_desc,
+            significant_contours=descriptors[:100],
         )
 
         return RawContourFeatures(
@@ -405,65 +477,90 @@ class FeatureExtractionService:
         )
 
     # =========================================================================
-    # 3. Skeleton Tracing, Curvature & Ordered Paths
+    # 3. Skeleton Branch Tracing & Curvature
     # =========================================================================
     def _trace_branch_paths(
         self,
         skeleton: NDArray[np.bool_],
-        nodes: list[GraphNode],
-        branches: list[GraphBranch],
+        nodes: list[GraphNode] | Mapping[str, GraphNode],
+        branches: list[GraphBranch] | Mapping[str, GraphBranch],
+        dist_transform: ImageArray | None = None,
         curvature_window: int = 7,
     ) -> list[OrderedBranchPath]:
-        """Trace continuous ordered pixel paths for each graph branch and calculate geometric curvature."""
-        node_map = {n.node_id: n for n in nodes}
+        """Order points along each branch path and compute curvature, bend angle, straightness, and wire width."""
         results: list[OrderedBranchPath] = []
+        node_dict: dict[str, GraphNode] = (
+            {n.node_id: n for n in nodes} if isinstance(nodes, list) else dict(nodes)
+        )
+        branch_list: list[GraphBranch] = (
+            list(branches) if isinstance(branches, list) else list(branches.values())
+        )
+        node_lookup = {nid: (n.point.x, n.point.y) for nid, n in node_dict.items()}
 
-        # Find connected components of skeleton between nodes
-        node_mask = np.zeros(skeleton.shape, dtype=bool)
-        for n in nodes:
-            # Mask out node vicinity so branches disconnect
-            cv2.circle(node_mask.view(np.uint8), (n.point.x, n.point.y), 3, 1, -1)
+        for branch in branch_list:
+            b_id = branch.branch_id
+            src_pt = node_lookup.get(branch.source_node_id, (0, 0))
+            tgt_pt = node_lookup.get(branch.target_node_id, (0, 0))
+            raw_pts = getattr(branch, "points", None)
+            if raw_pts and len(raw_pts) >= 2:
+                pts = [(p.x, p.y) if hasattr(p, "x") else (p[0], p[1]) for p in raw_pts]
+            else:
+                pts = [src_pt, tgt_pt]
 
-        for branch in branches:
-            src = node_map.get(branch.source_node_id)
-            tgt = node_map.get(branch.target_node_id)
-            if not src or not tgt:
-                continue
+            ordered = self._order_branch_points(pts)
 
-            # Trace straight-line seeded path through skeleton
-            pts = self._find_path_points_between_nodes(skeleton, src.point, tgt.point)
-            if len(pts) < 2:
-                pts = [(src.point.x, src.point.y), (tgt.point.x, tgt.point.y)]
+            # Euclidean straight line distance
+            dx = float(ordered[-1][0] - ordered[0][0])
+            dy = float(ordered[-1][1] - ordered[0][1])
+            straight_dist = math.hypot(dx, dy)
 
-            # Compute path length
-            path_len = 0.0
-            for i in range(len(pts) - 1):
-                dx = abs(pts[i + 1][0] - pts[i][0])
-                dy = abs(pts[i + 1][1] - pts[i][1])
-                path_len += math.sqrt(2.0) if (dx > 0 and dy > 0) else 1.0
+            # Along-wire path length
+            path_len = getattr(branch, "path_length_pixels", 0.0)
+            if path_len <= 0.0:
+                path_len = 0.0
+                for i in range(1, len(ordered)):
+                    path_len += math.hypot(ordered[i][0] - ordered[i - 1][0], ordered[i][1] - ordered[i - 1][1])
 
-            straight_dist = math.hypot(tgt.point.x - src.point.x, tgt.point.y - src.point.y)
-            straightness = round(straight_dist / max(1.0, path_len), 4)
-            straightness = min(1.0, straightness)
+            straightness = (straight_dist / path_len) if path_len > 0 else 1.0
+            straightness = min(1.0, max(0.0, straightness))
 
-            # Curvature and bend angles
-            mean_curv, max_bend = self._calculate_path_curvature(pts, window=curvature_window)
+            # Orientation angle in degrees [0, 360)
+            angle_rad = math.atan2(dy, dx)
+            angle_deg = (math.degrees(angle_rad) + 360.0) % 360.0
 
-            # Compact polyline (approximate with Douglas-Peucker)
-            compact = self._simplify_path(pts, epsilon=1.8)
+            # Local curvature and maximum bend angle along the path
+            mean_curv, max_bend = self._calculate_path_curvature(ordered, window=curvature_window)
+
+            # Wire width estimation via distance transform
+            mean_width = 0.0
+            if dist_transform is not None and len(ordered) > 0:
+                h_dt, w_dt = dist_transform.shape[:2]
+                widths = []
+                for px, py in ordered:
+                    if 0 <= px < w_dt and 0 <= py < h_dt:
+                        widths.append(float(dist_transform[py, px]) * 2.0)
+                if widths:
+                    mean_width = float(np.median(widths))
+
+            # Compact subsampled path for lightweight transmission
+            step = max(1, len(ordered) // 30)
+            compact = [[p[0], p[1]] for p in ordered[::step]]
+            if compact[-1] != [ordered[-1][0], ordered[-1][1]]:
+                compact.append([ordered[-1][0], ordered[-1][1]])
 
             results.append(
                 OrderedBranchPath(
-                    branch_id=branch.branch_id,
+                    branch_id=b_id,
                     source_node=branch.source_node_id,
                     target_node=branch.target_node_id,
-                    points=pts,
+                    points=ordered,
                     path_length_px=path_len,
                     straight_dist_px=straight_dist,
                     straightness_ratio=straightness,
-                    orientation_deg=branch.orientation_degrees,
+                    orientation_deg=angle_deg,
                     mean_curvature=mean_curv,
                     max_bend_angle_deg=max_bend,
+                    estimated_width_px=mean_width,
                     compact_path=compact,
                 )
             )
@@ -471,203 +568,166 @@ class FeatureExtractionService:
         return results
 
     @staticmethod
-    def _find_path_points_between_nodes(
-        skeleton: NDArray[np.bool_],
-        src: GraphPoint,
-        tgt: GraphPoint,
-    ) -> list[tuple[int, int]]:
-        """Find ordered 8-connected path between two points along the skeleton using BFS/A*."""
-        h, w = skeleton.shape
-        start = (src.x, src.y)
-        goal = (tgt.x, tgt.y)
+    def _order_branch_points(points: list[tuple[int, int]]) -> list[tuple[int, int]]:
+        """Order an unordered set of 8-connected skeleton points into a continuous traversal."""
+        if len(points) <= 2:
+            return points
 
-        # Fast search within bounding box with padding
-        pad = 20
-        min_x = max(0, min(src.x, tgt.x) - pad)
-        max_x = min(w - 1, max(src.x, tgt.x) + pad)
-        min_y = max(0, min(src.y, tgt.y) - pad)
-        max_y = min(h - 1, max(src.y, tgt.y) + pad)
+        pts_set = set(points)
+        start = min(points, key=lambda p: (p[0], p[1]))
 
-        visited = set()
-        queue = [(start, [start])]
-        visited.add(start)
+        ordered: list[tuple[int, int]] = [start]
+        pts_set.remove(start)
 
-        directions = [(-1, -1), (-1, 0), (-1, 1), (0, -1), (0, 1), (1, -1), (1, 0), (1, 1)]
+        current = start
+        while pts_set:
+            cx, cy = current
+            best_next = None
+            best_dist = 999999.0
+            for dx in (-1, 0, 1):
+                for dy in (-1, 0, 1):
+                    if dx == 0 and dy == 0:
+                        continue
+                    candidate = (cx + dx, cy + dy)
+                    if candidate in pts_set:
+                        d = math.hypot(dx, dy)
+                        if d < best_dist:
+                            best_dist = d
+                            best_next = candidate
+            if best_next is not None:
+                ordered.append(best_next)
+                pts_set.remove(best_next)
+                current = best_next
+            else:
+                next_nearest = min(pts_set, key=lambda p: math.hypot(p[0] - cx, p[1] - cy))
+                ordered.append(next_nearest)
+                pts_set.remove(next_nearest)
+                current = next_nearest
 
-        # If goal is reached or closest point when direct connection is slightly gapped
-        best_path = [start, goal]
-        min_dist_to_goal = math.hypot(start[0] - goal[0], start[1] - goal[1])
-
-        iterations = 0
-        max_iters = 8000
-
-        while queue and iterations < max_iters:
-            iterations += 1
-            curr, path = queue.pop(0)
-            cx, cy = curr
-
-            dist = math.hypot(cx - goal[0], cy - goal[1])
-            if dist <= 2.5:
-                path.append(goal)
-                return path
-
-            if dist < min_dist_to_goal:
-                min_dist_to_goal = dist
-                best_path = path
-
-            # Sort neighbours by Euclidean distance to goal (greedy A* behavior)
-            nbrs = []
-            for dx, dy in directions:
-                nx, ny = cx + dx, cy + dy
-                if min_x <= nx <= max_x and min_y <= ny <= max_y:
-                    if (nx, ny) not in visited:
-                        # Allow path to traverse skeleton pixels, or reach near the goal
-                        if skeleton[ny, nx] or (math.hypot(nx - goal[0], ny - goal[1]) <= 2.0):
-                            nbrs.append((nx, ny))
-
-            nbrs.sort(key=lambda p: math.hypot(p[0] - goal[0], p[1] - goal[1]))
-            for nbr in nbrs:
-                visited.add(nbr)
-                queue.append((nbr, path + [nbr]))
-
-        return best_path + [goal]
+        return ordered
 
     @staticmethod
     def _calculate_path_curvature(
         points: list[tuple[int, int]],
         window: int = 7,
     ) -> tuple[float, float]:
-        """Compute mean discrete curvature and maximum bend angle along an ordered path."""
-        if len(points) < window * 2 + 1:
+        """Compute mean curvature and maximum bend angle using tangent angle changes."""
+        if len(points) < window * 2:
             return 0.0, 0.0
 
-        bend_angles: list[float] = []
-        curvatures: list[float] = []
+        half_w = max(1, window // 2)
+        angles: list[float] = []
 
-        w = max(2, window // 2)
-        for i in range(w, len(points) - w):
-            p_prev = points[i - w]
-            p_curr = points[i]
-            p_next = points[i + w]
+        for i in range(half_w, len(points) - half_w):
+            p_prev = points[i - half_w]
+            p_next = points[i + half_w]
+            dx = p_next[0] - p_prev[0]
+            dy = p_next[1] - p_prev[1]
+            angles.append(math.atan2(dy, dx))
 
-            v1 = (p_curr[0] - p_prev[0], p_curr[1] - p_prev[1])
-            v2 = (p_next[0] - p_curr[0], p_next[1] - p_curr[1])
+        if len(angles) < 2:
+            return 0.0, 0.0
 
-            len1 = math.hypot(v1[0], v1[1])
-            len2 = math.hypot(v2[0], v2[1])
+        angle_diffs: list[float] = []
+        for i in range(1, len(angles)):
+            diff = abs(angles[i] - angles[i - 1])
+            if diff > math.pi:
+                diff = 2 * math.pi - diff
+            angle_diffs.append(diff)
 
-            if len1 == 0 or len2 == 0:
-                continue
+        mean_curv = float(np.mean(angle_diffs)) if angle_diffs else 0.0
+        max_bend_deg = math.degrees(float(np.max(angle_diffs))) if angle_diffs else 0.0
 
-            dot = (v1[0] * v2[0] + v1[1] * v2[1]) / (len1 * len2)
-            dot = max(-1.0, min(1.0, dot))
-            angle_rad = math.acos(dot)
-            angle_deg = math.degrees(angle_rad)
-
-            bend_angles.append(angle_deg)
-            # Local curvature = angle / arc length
-            arc_len = (len1 + len2) / 2.0
-            if arc_len > 0:
-                curvatures.append(angle_rad / arc_len)
-
-        mean_curv = float(np.mean(curvatures)) if curvatures else 0.0
-        max_bend = float(np.max(bend_angles)) if bend_angles else 0.0
-        return mean_curv, max_bend
-
-    @staticmethod
-    def _simplify_path(points: list[tuple[int, int]], epsilon: float = 1.8) -> list[list[int]]:
-        """Compress ordered pixel path using Douglas-Peucker approximation for compact representation."""
-        if len(points) <= 2:
-            return [[int(x), int(y)] for x, y in points]
-
-        pts_array = np.array(points, dtype=np.int32).reshape((-1, 1, 2))
-        simplified = cv2.approxPolyDP(pts_array, epsilon, False)
-        return [[int(pt[0][0]), int(pt[0][1])] for pt in simplified]
+        return mean_curv, max_bend_deg
 
     # =========================================================================
-    # 4. Crossing vs. True Joint Discrimination
+    # 4. Junction Classification: Crossing vs. Joint
     # =========================================================================
     @staticmethod
     def _classify_junctions(
-        nodes: list[GraphNode],
+        nodes: list[GraphNode] | Mapping[str, GraphNode],
         branches: list[OrderedBranchPath],
     ) -> list[JunctionCandidate]:
-        """Classify junction candidates and determine if they are simple visual wire crossings or spliced joints."""
-        junctions: list[JunctionCandidate] = []
+        """Discriminate between visual wire overlap crossings vs spliced joints.
 
-        for node in nodes:
-            if node.node_type != "JUNCTION":
+        A junction with degree 4 having two opposing pairs of branch vectors (~180 deg)
+        is a simple physical pass-through crossing.
+        Non-orthogonal or degree-3/5+ junctions are true joint candidates or uncertain splices.
+        """
+        junctions: list[JunctionCandidate] = []
+        node_list: list[GraphNode] = list(nodes) if isinstance(nodes, list) else list(nodes.values())
+
+        for node in node_list:
+            if getattr(node, "node_type", "").upper() != "JUNCTION":
                 continue
 
-            branch_angles = [float(bo.angle_degrees) for bo in node.branch_orientations]
-            is_simple_crossing = False
+            n_id = node.node_id
+            angles = [bo.angle_degrees for bo in getattr(node, "branch_orientations", [])]
+            degree = getattr(node, "branch_count", len(angles))
 
-            # A 4-way intersection (or degree 4) where opposing branches are ~180° apart indicates a visual crossing
-            if len(branch_angles) == 4:
-                sorted_angles = sorted(branch_angles)
-                # Check pairs: (0, 2) and (1, 3)
-                diff1 = abs((sorted_angles[2] - sorted_angles[0]) - 180.0)
-                diff2 = abs((sorted_angles[3] - sorted_angles[1]) - 180.0)
-                if diff1 <= 30.0 and diff2 <= 30.0:
-                    is_simple_crossing = True
+            is_crossing = False
+            is_uncertain = False
+
+            if degree == 4 and len(angles) == 4:
+                sorted_ang = sorted(angles)
+                diff1 = abs((sorted_ang[2] - sorted_ang[0]) - 180.0)
+                diff2 = abs((sorted_ang[3] - sorted_ang[1]) - 180.0)
+                if diff1 < 35.0 and diff2 < 35.0:
+                    is_crossing = True
+                else:
+                    is_uncertain = True
+            elif degree >= 5:
+                is_uncertain = True
 
             junctions.append(
                 JunctionCandidate(
-                    id=node.node_id,
+                    id=n_id,
                     x=node.point.x,
                     y=node.point.y,
-                    branch_count=node.branch_count,
-                    is_simple_crossing=is_simple_crossing,
-                    branch_angles_deg=[round(a, 2) for a in branch_angles],
+                    branch_count=degree,
+                    is_simple_crossing=is_crossing,
+                    is_uncertain=is_uncertain,
+                    branch_angles_deg=angles,
                 )
             )
 
         return junctions
 
     # =========================================================================
-    # 5. Endpoint Tangent Extraction
+    # 5. Endpoint Extraction & Tangent Angles
     # =========================================================================
     @staticmethod
     def _extract_endpoints_with_tangents(
-        nodes: list[GraphNode],
+        nodes: list[GraphNode] | Mapping[str, GraphNode],
         branches: list[OrderedBranchPath],
     ) -> list[EndpointCandidate]:
-        """Extract endpoint candidates and calculate local tangent orientation along the incident branch."""
+        """Extract terminal endpoints with outbound tangent angles."""
         endpoints: list[EndpointCandidate] = []
+        node_list: list[GraphNode] = list(nodes) if isinstance(nodes, list) else list(nodes.values())
 
-        for node in nodes:
-            if node.node_type != "END_TERMINAL":
+        for node in node_list:
+            ntype = getattr(node, "node_type", "").upper()
+            if ntype not in ("END_TERMINAL", "TERMINAL"):
                 continue
 
-            # Find incident branch to determine outward tangent direction
-            tangent_angle = 0.0
-            for b in branches:
-                if b.source_node == node.node_id and len(b.points) >= 4:
-                    # Vector from node into the branch, then flip to point outward
-                    p1 = b.points[0]
-                    p2 = b.points[min(5, len(b.points) - 1)]
-                    tangent_angle = math.degrees(math.atan2(p1[1] - p2[1], p1[0] - p2[0])) % 360.0
-                    break
-                elif b.target_node == node.node_id and len(b.points) >= 4:
-                    p1 = b.points[-1]
-                    p2 = b.points[max(0, len(b.points) - 6)]
-                    tangent_angle = math.degrees(math.atan2(p1[1] - p2[1], p1[0] - p2[0])) % 360.0
-                    break
+            n_id = node.node_id
+            orientations = getattr(node, "branch_orientations", [])
+            tangent_deg = orientations[0].angle_degrees if orientations else 0.0
 
             endpoints.append(
                 EndpointCandidate(
-                    id=node.node_id,
+                    id=n_id,
                     x=node.point.x,
                     y=node.point.y,
-                    tangent_angle_deg=round(tangent_angle, 2),
-                    connection_degree=node.branch_count,
+                    tangent_angle_deg=round(tangent_deg, 2),
+                    connection_degree=getattr(node, "branch_count", 1),
                 )
             )
 
         return endpoints
 
     # =========================================================================
-    # 6. Terminal and Joint Candidate ROIs for Part Identification
+    # 6. Candidate Regions for Part Identification Module
     # =========================================================================
     @staticmethod
     def _extract_candidate_rois_for_part_id(
@@ -675,13 +735,9 @@ class FeatureExtractionService:
         mask: ImageArray,
         endpoints: list[EndpointCandidate],
         junctions: list[JunctionCandidate],
-        roi_half_size: int = 24,
+        roi_half_size: int = 18,
     ) -> list[CandidateRegionForPartId]:
-        """Generate bounding regions and local shape descriptors for the Part Identification module.
-
-        Important: An endpoint is only a candidate terminal location. It must NOT be claimed as a
-        detected terminal solely from a skeleton endpoint until Part Identification verifies it.
-        """
+        """Generate bounding regions for terminal pin connectors and spliced joints."""
         h, w = image.shape[:2]
         candidates: list[CandidateRegionForPartId] = []
 
@@ -745,11 +801,14 @@ class FeatureExtractionService:
         junctions: list[JunctionCandidate],
         branches: list[OrderedBranchPath],
     ) -> GeometricFeatures:
-        """Calculate pairwise feature point distances, straightness distribution and max bend angles."""
+        """Calculate pairwise feature point distances, straightness distribution, max bend angles, and wire widths."""
         straightnesses = [b.straightness_ratio for b in branches]
         mean_straightness = float(np.mean(straightnesses)) if straightnesses else 1.0
         max_bends = [b.max_bend_angle_deg for b in branches]
         max_bend_deg = float(np.max(max_bends)) if max_bends else 0.0
+
+        widths = [b.estimated_width_px for b in branches if b.estimated_width_px > 0]
+        mean_width = float(np.mean(widths)) if widths else 0.0
 
         # Pairwise distances between nearest feature points
         pairwise: list[PairwiseDistance] = []
@@ -760,7 +819,7 @@ class FeatureExtractionService:
             all_points.append((jc.id, jc.x, jc.y))
 
         for i in range(len(all_points)):
-            for j in range(i + 1, min(len(all_points), i + 6)):  # Nearest neighborhood pairs
+            for j in range(i + 1, min(len(all_points), i + 6)):
                 id1, x1, y1 = all_points[i]
                 id2, x2, y2 = all_points[j]
                 dist = math.hypot(x2 - x1, y2 - y1)
@@ -777,16 +836,19 @@ class FeatureExtractionService:
             max_bend_angle_deg=round(max_bend_deg, 2),
             total_detected_joints=len(junctions),
             total_detected_terminals=len(endpoints),
+            mean_estimated_wire_width_pixels=round(mean_width, 2),
             pairwise_feature_distances=pairwise[:40],
         )
 
     # =========================================================================
-    # 8. Multi-Layer Visualizations
+    # 8. 10 Diagnostic Engineering View Visualizations
     # =========================================================================
     def _generate_visualizations(
         self,
-        image: ImageArray,
+        raw_original: ImageArray,
+        preprocessed_img: ImageArray,
         mask: ImageArray,
+        isolated_harness_img: ImageArray | None,
         edge_data: RawEdgeFeatures,
         contour_data: RawContourFeatures,
         skeleton_img: ImageArray,
@@ -795,20 +857,39 @@ class FeatureExtractionService:
         branches: list[OrderedBranchPath],
         candidate_rois: list[CandidateRegionForPartId],
     ) -> FeatureVisualizations:
-        """Create 6 distinct, professionally styled visualization layers as PNG data URLs."""
-        h, w = image.shape[:2]
+        """Create 10 distinct, diagnostic Engineering View visualization layers."""
+        h, w = preprocessed_img.shape[:2]
 
-        # 1. Preprocessed original
-        vis_preprocessed = _encode_png_base64(image)
+        # 1. Original Image (Raw upload)
+        vis_original = _encode_image_base64(raw_original)
 
-        # 2. Edge Map (Cyan boundary edges on dark background, dim red filtered noise)
-        edge_canvas = np.zeros((h, w, 3), dtype=np.uint8)
-        edge_canvas[edge_data.filtered_edges > 0] = (30, 30, 160)  # dim red background noise
-        edge_canvas[edge_data.boundary_edges > 0] = (255, 230, 0)   # bright cyan boundary edges
-        vis_edge = _encode_png_base64(edge_canvas)
+        # 2. Preprocessed Image (Denoised, illumination normalized)
+        vis_preprocessed = _encode_image_base64(preprocessed_img)
 
-        # 3. Contour Visualization
-        contour_canvas = image.copy()
+        # 3. Segmentation Overlay (Semi-transparent emerald mask over preprocessed workpiece)
+        seg_overlay = preprocessed_img.copy()
+        mask_bool = mask > 0
+        if np.any(mask_bool):
+            green_tint = np.array([30, 200, 30], dtype=np.float32)
+            seg_overlay[mask_bool] = (
+                seg_overlay[mask_bool].astype(np.float32) * 0.45 + green_tint * 0.55
+            ).astype(np.uint8)
+        vis_seg_overlay = _encode_image_base64(seg_overlay)
+
+        # 4. Binary Harness Mask (Exact 1-bit binary representation: wires white 255, background 0)
+        vis_binary_mask = _encode_image_base64(mask, is_mask=True)
+
+        # 5. Isolated Harness on White Background (No board markings, text, or lines)
+        if isolated_harness_img is not None:
+            vis_isolated = _encode_image_base64(isolated_harness_img)
+        else:
+            isolated_canvas = np.full_like(preprocessed_img, 255)
+            if np.any(mask_bool):
+                isolated_canvas[mask_bool] = preprocessed_img[mask_bool]
+            vis_isolated = _encode_image_base64(isolated_canvas)
+
+        # 6. Contour Visualization (External boundaries green, internal voids yellow, bounding boxes)
+        contour_canvas = preprocessed_img.copy()
         for desc in contour_data.contours_info.significant_contours:
             cnt = contour_data.raw_contours[desc.contour_id]
             color = (0, 230, 255) if desc.is_internal else (0, 220, 0)
@@ -834,85 +915,92 @@ class FeatureExtractionService:
                 2,
                 cv2.LINE_AA,
             )
-        vis_contour = _encode_png_base64(contour_canvas)
+        vis_contour = _encode_image_base64(contour_canvas)
 
-        # 4. Skeleton Visualization (amber centerline on neutral board)
-        skel_canvas = np.full((h, w, 3), 32, dtype=np.uint8)
+        # 7. Skeleton Visualization (1-pixel centerline highlighted on clean dark surface)
+        skel_canvas = np.full((h, w, 3), 28, dtype=np.uint8)
         dilated_skel = cv2.dilate(
             skeleton_img,
             cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3)),
         )
-        skel_canvas[dilated_skel > 0] = (0, 175, 255)  # amber centerline
-        vis_skeleton = _encode_png_base64(skel_canvas)
+        skel_canvas[dilated_skel > 0] = (0, 185, 255)  # Amber centerline
+        vis_skeleton = _encode_image_base64(skel_canvas)
 
-        # 5. Keypoints & Junction Visualization (endpoints green, true joints red, crossings orange)
-        kp_canvas = image.copy()
-        # Draw candidate ROI bounding boxes
+        # 8. Endpoints and Junction Visualization (Green endpoints, Red joints, Orange crossings)
+        kp_canvas = preprocessed_img.copy()
         for roi in candidate_rois:
             b = roi.bounding_box
             box_col = (0, 200, 0) if roi.candidate_type == "TERMINAL_CANDIDATE" else (0, 0, 230)
             cv2.rectangle(kp_canvas, (b.x, b.y), (b.x + b.width, b.y + b.height), box_col, 1, cv2.LINE_AA)
 
-        # Draw Endpoints
         for ep in endpoints:
             cv2.circle(kp_canvas, (ep.x, ep.y), 7, (255, 255, 255), -1, cv2.LINE_AA)
             cv2.circle(kp_canvas, (ep.x, ep.y), 5, (0, 200, 0), -1, cv2.LINE_AA)
-            cv2.putText(
-                kp_canvas,
-                ep.id,
-                (ep.x + 8, ep.y - 6),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.45,
-                (0, 240, 0),
-                1,
-                cv2.LINE_AA,
-            )
+            cv2.putText(kp_canvas, ep.id, (ep.x + 8, ep.y - 6), cv2.FONT_HERSHEY_SIMPLEX, 0.45, (0, 240, 0), 1, cv2.LINE_AA)
 
-        # Draw Junctions & Crossings
         for jc in junctions:
             j_col = (0, 140, 255) if jc.is_simple_crossing else (0, 0, 230)
             cv2.circle(kp_canvas, (jc.x, jc.y), 9, (255, 255, 255), -1, cv2.LINE_AA)
             cv2.circle(kp_canvas, (jc.x, jc.y), 7, j_col, -1, cv2.LINE_AA)
             tag = f"{jc.id}{' (X)' if jc.is_simple_crossing else ''}"
-            cv2.putText(
-                kp_canvas,
-                tag,
-                (jc.x + 10, jc.y - 8),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.45,
-                j_col,
-                1,
-                cv2.LINE_AA,
-            )
-        vis_keypoints = _encode_png_base64(kp_canvas)
+            cv2.putText(kp_canvas, tag, (jc.x + 10, jc.y - 8), cv2.FONT_HERSHEY_SIMPLEX, 0.45, j_col, 1, cv2.LINE_AA)
+        vis_keypoints = _encode_image_base64(kp_canvas)
 
-        # 6. Combined Feature Overlay
-        overlay = image.copy()
-        # Overlay skeleton
-        overlay[dilated_skel > 0] = (
-            overlay[dilated_skel > 0].astype(np.float32) * 0.3 + np.array([0, 185, 255]) * 0.7
+        # 9. Branch Paths Visualization (Distinct pseudo-colors per wire branch)
+        branch_canvas = preprocessed_img.copy()
+        palette = [
+            (255, 99, 71),   # Tomato
+            (30, 144, 255),  # Dodger blue
+            (50, 205, 50),   # Lime green
+            (255, 215, 0),   # Gold
+            (147, 112, 219), # Medium purple
+            (0, 206, 209),   # Dark turquoise
+            (255, 105, 180), # Hot pink
+            (255, 140, 0),   # Dark orange
+        ]
+        for idx, b in enumerate(branches):
+            col = palette[idx % len(palette)]
+            if len(b.points) >= 2:
+                pts_arr = np.array(b.points, dtype=np.int32).reshape((-1, 1, 2))
+                cv2.polylines(branch_canvas, [pts_arr], False, col, 3, cv2.LINE_AA)
+                # Draw branch label at midpoint
+                mid_pt = b.points[len(b.points) // 2]
+                cv2.putText(
+                    branch_canvas,
+                    b.branch_id,
+                    (mid_pt[0] + 5, mid_pt[1] - 5),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.40,
+                    col,
+                    1,
+                    cv2.LINE_AA,
+                )
+        vis_branches = _encode_image_base64(branch_canvas)
+
+        # 10. Feature Extraction Results (Rich Composite Overlay)
+        composite = preprocessed_img.copy()
+        composite[dilated_skel > 0] = (
+            composite[dilated_skel > 0].astype(np.float32) * 0.3 + np.array([0, 185, 255]) * 0.7
         ).astype(np.uint8)
 
-        # Overlay main contour
         if contour_data.main_contour_index is not None:
             mc = contour_data.raw_contours[contour_data.main_contour_index]
-            cv2.drawContours(overlay, [mc], -1, (255, 255, 0), 2, cv2.LINE_AA)
+            cv2.drawContours(composite, [mc], -1, (255, 255, 0), 2, cv2.LINE_AA)
 
-        # Overlay keypoints
         for ep in endpoints:
-            cv2.circle(overlay, (ep.x, ep.y), 6, (0, 220, 0), -1, cv2.LINE_AA)
+            cv2.circle(composite, (ep.x, ep.y), 6, (0, 220, 0), -1, cv2.LINE_AA)
         for jc in junctions:
             col = (0, 140, 255) if jc.is_simple_crossing else (0, 0, 230)
-            cv2.circle(overlay, (jc.x, jc.y), 8, col, -1, cv2.LINE_AA)
+            cv2.circle(composite, (jc.x, jc.y), 8, col, -1, cv2.LINE_AA)
 
-        # Header overlay bar
-        bar_h = max(38, int(h * 0.055))
-        bar = overlay.copy()
+        # Top diagnostic status bar
+        bar_h = min(h, max(20, int(h * 0.055)))
+        bar = composite.copy()
         cv2.rectangle(bar, (0, 0), (w, bar_h), (20, 20, 20), -1)
-        cv2.addWeighted(bar, 0.75, overlay, 0.25, 0, overlay)
+        cv2.addWeighted(bar, 0.75, composite, 0.25, 0, composite)
         cv2.putText(
-            overlay,
-            f"FEATURE EXTRACTION OVERLAY: {len(branches)} Branches | {len(endpoints)} Terminal Candidates | {len(junctions)} Junctions",
+            composite,
+            f"HARNESS DIAGNOSTICS: {len(branches)} Branches | {len(endpoints)} Terminals | {len(junctions)} Junctions",
             (14, bar_h - 12),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.48,
@@ -920,15 +1008,30 @@ class FeatureExtractionService:
             1,
             cv2.LINE_AA,
         )
-        vis_combined = _encode_png_base64(overlay)
+        vis_composite = _encode_image_base64(composite)
+
+        # Edge canvas for backward compatibility
+        edge_canvas = np.zeros((h, w, 3), dtype=np.uint8)
+        edge_canvas[edge_data.filtered_edges > 0] = (30, 30, 160)
+        edge_canvas[edge_data.boundary_edges > 0] = (255, 230, 0)
+        vis_edge = _encode_image_base64(edge_canvas)
 
         return FeatureVisualizations(
-            original_preprocessed=vis_preprocessed,
-            edge_map=vis_edge,
+            original_image=vis_original,
+            preprocessed_image=vis_preprocessed,
+            segmentation_overlay=vis_seg_overlay,
+            binary_mask=vis_binary_mask,
+            isolated_harness=vis_isolated,
             contour_visualization=vis_contour,
             skeleton_visualization=vis_skeleton,
+            endpoints_junctions_visualization=vis_keypoints,
+            branch_paths_visualization=vis_branches,
+            feature_extraction_results=vis_composite,
+            # Backward compatibility aliases
+            original_preprocessed=vis_preprocessed,
+            edge_map=vis_edge,
             keypoint_junction_visualization=vis_keypoints,
-            combined_overlay=vis_combined,
+            combined_overlay=vis_composite,
         )
 
     @staticmethod

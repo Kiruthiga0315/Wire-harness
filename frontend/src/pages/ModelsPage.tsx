@@ -22,11 +22,11 @@ const DEFAULT_MODELS: RecipeModel[] = [
     id: 'DEMO-HARNESS-001',
     name: 'Client Wire Harness Sample',
     revision: 'V1.0',
-    checkpointsCount: 35,
+    checkpointsCount: 12,
     referenceImage: 'harness_sample_01.jpeg',
     created: '12 Aug 2026',
     status: 'ACTIVE',
-    description: 'Wire harness recipe synchronized with physical golden reference checkpoints.',
+    description: 'Deterministic demo recipe with 12 CP-* checkpoints for connectors, terminals, and routing.',
   },
 ]
 
@@ -350,7 +350,7 @@ export function ModelsPage() {
                       ) : (
                         <tr>
                           <td colSpan={6} style={{ textAlign: 'center', color: 'var(--slate-500)', padding: 14 }}>
-                            {loadingCheckpoints ? 'Fetching checkpoints from backend database…' : 'Synchronized golden reference checkpoints assigned.'}
+                            {loadingCheckpoints ? 'Fetching checkpoints from backend database…' : '12 default deterministic checkpoints (CP-001 through CP-012) assigned.'}
                           </td>
                         </tr>
                       )}

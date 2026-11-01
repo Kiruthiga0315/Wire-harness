@@ -12,6 +12,7 @@ from app.services.active_image_service import (
     resolve_demo_image,
 )
 from app.services.cloud_io import UploadedImageValidationError
+from app.api.routes.engineering import clear_feature_cache
 
 router = APIRouter(prefix="/test-images", tags=["Test Images"])
 
@@ -28,6 +29,7 @@ async def upload_active_image(file: UploadFile = File(...)) -> dict[str, object]
             filename=file.filename or "uploaded_image.png",
             content_type=file.content_type,
         )
+        clear_feature_cache()
     except UploadedImageValidationError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except Exception as exc:

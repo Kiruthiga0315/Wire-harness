@@ -89,6 +89,12 @@ data/test_images/*
 data/reference_images/*
 data/calibration/*
 data/models/*
+data/crop_*.jpg
+data/test_preview.jpg
+data/shifts/
+data/temp_seg/
+data/thumbnails/
+data/original_images/
 
 # Retain directory structure with .gitkeep
 !data/captured_images/.gitkeep
@@ -99,7 +105,6 @@ data/models/*
 !data/calibration/.gitkeep
 !data/models/.gitkeep
 !data/test_images/harness_sample_01.jpeg*
-!data/test_images/harness_sample_01_raw_459x1024.jpeg
 
 # Machine Learning model weights and serialized checkpoints
 *.pt

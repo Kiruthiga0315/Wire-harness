@@ -1,0 +1,22 @@
+# HARNESSVISION - Universal YOLOv8 Instance Segmentation Dataset Configuration
+# Defines dataset splits and class taxonomy for wire harness inspection.
+
+path: ../data/dataset # dataset root dir
+train: images/train   # train images (relative to 'path')
+val: images/val       # val images (relative to 'path')
+test: images/test     # test images (optional, relative to 'path')
+
+# Classes
+names:
+  0: wire_trunk
+  1: wire_branch
+  2: connector
+  3: terminal_pin
+  4: tape_wrap
+
+# Class descriptions & engineering inspection semantics:
+# 0 - wire_trunk: Central thick multi-wire harness spine/trunk bundle
+# 1 - wire_branch: Individual breakout wires or secondary branch paths
+# 2 - connector: Multi-pin plastic housing, headers, or block terminals
+# 3 - terminal_pin: Metal crimp terminals, eyelets, or bare pin contacts
+# 4 - tape_wrap: Spot tape, spiral vinyl wrap, or protective conduit

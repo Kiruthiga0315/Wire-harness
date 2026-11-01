@@ -118,8 +118,10 @@ class HarnessGraphService:
                 w = int(binary_mask.shape[1])
                 pixels_per_cm = pixels_per_cm_for_width(w)
             except Exception:
+                # Ultimate fallback: proportional to calibration reference
+                # Calibration: 459px wide image → 47.70 px/cm
                 w = int(binary_mask.shape[1])
-                pixels_per_cm = round(5.0 * (float(w) / 459.0), 4)
+                pixels_per_cm = round(47.70 * (w / 459), 4)
 
         skeleton_bool = skeletonize(binary_mask > 0)
         skeleton = skeleton_bool.astype(np.uint8)
@@ -482,108 +484,3 @@ class HarnessGraphService:
                 cv2.circle(canvas, (node.point.x, node.point.y), 4, (255, 255, 255), -1, cv2.LINE_AA)
 
         return canvas
-
-    def resolve_branch_path_length_pixels(
-        self,
-        graph_res: HarnessGraphResult,
-        target_xy: tuple[int, int],
-        *,
-        source_xy: tuple[int, int] | None = None,
-        search_radius: int = 75,
-        skeleton_mask: ImageArray | None = None,
-    ) -> float | None:
-        """Resolve the true skeleton geodesic path length in pixels for a branch.
-
-        Finds the matching terminal or junction node in the graph, extracts the
-        topological branch length to its connecting junction or node, and falls
-        back to 8-connected medial-axis geodesic tracing if necessary.
-        Returns None if no connected skeleton branch can be resolved.
-        """
-        tx, ty = target_xy
-
-        # 1. Match target node in graph
-        best_target_node = None
-        best_target_dist = float("inf")
-        for node in graph_res.nodes:
-            dist = math.hypot(node.point.x - tx, node.point.y - ty)
-            if dist < best_target_dist:
-                best_target_dist = dist
-                best_target_node = node
-
-        # If source_xy is provided (e.g. node-to-node or specified junction)
-        if source_xy is not None:
-            sx, sy = source_xy
-            best_source_node = None
-            best_source_dist = float("inf")
-            for node in graph_res.nodes:
-                dist = math.hypot(node.point.x - sx, node.point.y - sy)
-                if dist < best_source_dist:
-                    best_source_dist = dist
-                    best_source_node = node
-
-            if (
-                best_target_node is not None
-                and best_source_node is not None
-                and best_target_dist <= search_radius
-                and best_source_dist <= search_radius
-                and best_target_node.node_id != best_source_node.node_id
-            ):
-                # Search for direct branch between them
-                for branch in graph_res.branches:
-                    if {branch.source_node_id, branch.target_node_id} == {
-                        best_source_node.node_id,
-                        best_target_node.node_id,
-                    }:
-                        return branch.path_length_pixels
-
-        # 2. Terminal to junction branch lookup
-        if best_target_node is not None and best_target_dist <= search_radius:
-            # Check junction-terminal distances: choose the longest branch to main junction
-            matching_jts = [
-                jt
-                for jt in graph_res.junction_terminal_distances
-                if jt.terminal_node_id == best_target_node.node_id
-            ]
-            if matching_jts:
-                return max(jt.path_distance_pixels for jt in matching_jts)
-
-            # Check branches connected to this node
-            matching_branches = [
-                branch
-                for branch in graph_res.branches
-                if best_target_node.node_id in (branch.source_node_id, branch.target_node_id)
-            ]
-            if matching_branches:
-                return max(branch.path_length_pixels for branch in matching_branches)
-
-        # 3. Direct skeleton medial axis BFS tracing fallback
-        skel = skeleton_mask if skeleton_mask is not None else (graph_res.skeleton_image > 0)
-        if skel is not None and np.any(skel):
-            h, w = skel.shape[:2]
-            pts = np.argwhere(skel)
-            dists = (pts[:, 1] - tx) ** 2 + (pts[:, 0] - ty) ** 2
-            nearest_idx = int(np.argmin(dists))
-            if dists[nearest_idx] <= search_radius**2:
-                sy, sx = int(pts[nearest_idx, 0]), int(pts[nearest_idx, 1])
-                visited = {(sy, sx)}
-                queue = [(sy, sx, 0.0)]
-                while queue:
-                    cy, cx, cur_len = queue.pop(0)
-                    nbrs = []
-                    for dy in (-1, 0, 1):
-                        for dx in (-1, 0, 1):
-                            if dy == 0 and dx == 0:
-                                continue
-                            ny, nx = cy + dy, cx + dx
-                            if 0 <= ny < h and 0 <= nx < w and skel[ny, nx]:
-                                nbrs.append((ny, nx))
-                    # Reached a junction cluster or degree > 2
-                    if len(nbrs) > 2 and cur_len > 12.0:
-                        return cur_len
-                    for ny, nx in nbrs:
-                        if (ny, nx) not in visited:
-                            visited.add((ny, nx))
-                            step = 1.4142 if (ny != cy and nx != cx) else 1.0
-                            queue.append((ny, nx, cur_len + step))
-
-        return None

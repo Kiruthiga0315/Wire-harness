@@ -121,72 +121,10 @@ async def process_demo_inspection(
     )
 
     sticker_report = _build_sticker_report()
-    # For workpiece inspection (len > 12), evaluate real CV measurements from golden inspection service
+    # For workpiece inspection (len > 12), overall state reflects checkpoints pass/fail
     if len(checkpoints) > 12:
-        try:
-            from app.services.golden_inspection_service import golden_inspection_service
-            from app.schemas.inspection import InspectionBoundingBox
-            golden_res = golden_inspection_service.inspect_image(active_rec.bgr_image)
-            results_map = {r.checkpoint_id: r for r in golden_res.results}
-            real_results: list[MockCheckpointResult] = []
-            failed_count = 0
-            for index, cp in enumerate(checkpoints):
-                gr = results_map.get(cp.checkpoint_id)
-                if gr is not None:
-                    status = "PASS" if gr.status == "PASS" else "NG"
-                    if status == "NG":
-                        failed_count += 1
-                    actual_val = f"{gr.detected_value:.1f} mm" if gr.detected_value is not None else cp.expected_value
-                    dev_val = f"{gr.deviation:+.1f} mm" if gr.deviation is not None else None
-                    rx, ry, rw, rh = gr.roi_bbox
-                    bb = InspectionBoundingBox(x=rx, y=ry, width=rw, height=rh)
-                    real_results.append(
-                        MockCheckpointResult(
-                            checkpoint_id=cp.checkpoint_id,
-                            checkpoint_name=cp.checkpoint_name,
-                            category=cp.category,
-                            inspection_type=cp.inspection_type,
-                            expected_value=cp.expected_value,
-                            actual_value=actual_val,
-                            tolerance=cp.tolerance,
-                            deviation=dev_val,
-                            confidence=gr.confidence,
-                            status=status,
-                            status_reason=gr.message,
-                            bounding_box=bb,
-                        )
-                    )
-                else:
-                    cp_res = response.results[index] if index < len(response.results) else MockCheckpointResult(
-                        checkpoint_id=cp.checkpoint_id,
-                        checkpoint_name=cp.checkpoint_name,
-                        category=cp.category,
-                        inspection_type=cp.inspection_type,
-                        expected_value=cp.expected_value,
-                        actual_value=cp.expected_value,
-                        tolerance=cp.tolerance,
-                        deviation=None,
-                        confidence=0.98,
-                        status="PASS",
-                        status_reason="Verified",
-                        bounding_box=InspectionBoundingBox(x=cp.reference_x, y=cp.reference_y, width=cp.roi_width, height=cp.roi_height),
-                    )
-                    if cp_res.status == "NG":
-                        failed_count += 1
-                    real_results.append(cp_res)
-            response_results = real_results
-            passed_count = len(real_results) - failed_count
-            final_state = "NG" if failed_count > 0 else "PASS"
-        except Exception as exc:
-            logger.warning("Real inspection error, fallback to baseline: %s", exc)
-            response_results = response.results
-            passed_count = response.passed
-            failed_count = response.failed
-            final_state = response.state
+        final_state = response.state
     else:
-        response_results = response.results
-        passed_count = response.passed
-        failed_count = response.failed
         final_state = response.state if sticker_report.present else "NG"
 
     result_response = MockInspectionResponse(
@@ -194,13 +132,13 @@ async def process_demo_inspection(
         model_id=response.model_id,
         model_name=response.model_name,
         state=final_state,
-        total_checkpoints=len(response_results),
-        passed=passed_count,
-        failed=failed_count,
+        total_checkpoints=response.total_checkpoints,
+        passed=response.passed,
+        failed=response.failed,
         warnings=response.warnings,
         cycle_time_seconds=response.cycle_time_seconds,
         timestamp=response.timestamp,
-        results=response_results,
+        results=response.results,
         sticker_inspection=sticker_report,
     )
 

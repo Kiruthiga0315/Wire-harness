@@ -72,6 +72,10 @@ class JunctionCandidate(BaseModel):
         ...,
         description="True if junction exhibits orthogonal/pass-through geometry typical of visual wire overlap rather than spliced electrical joint",
     )
+    is_uncertain: bool = Field(
+        default=False,
+        description="True if junction exhibits complex or ambiguous branching requiring operator review",
+    )
     branch_angles_deg: list[float] = Field(default_factory=list)
 
 
@@ -85,6 +89,7 @@ class BranchFeature(BaseModel):
     orientation_deg: float = Field(..., description="Overall branch orientation in degrees [0, 360)")
     mean_curvature: float = Field(..., description="Mean curvature along the branch path")
     max_bend_angle_deg: float = Field(..., description="Maximum local bend angle observed along the branch")
+    estimated_width_pixels: float = Field(default=0.0, description="Estimated wire diameter/width in pixels")
     compact_path: list[list[int]] = Field(default_factory=list, description="Subsampled or keypoint coordinates [[x, y], ...]")
 
 
@@ -120,16 +125,43 @@ class GeometricFeatures(BaseModel):
     max_bend_angle_deg: float
     total_detected_joints: int
     total_detected_terminals: int
+    mean_estimated_wire_width_pixels: float = 0.0
     pairwise_feature_distances: list[PairwiseDistance] = Field(default_factory=list)
 
 
 class FeatureVisualizations(BaseModel):
-    original_preprocessed: str | None = None
-    edge_map: str | None = None
+    # 10 Diagnostic Engineering Views
+    original_image: str | None = None
+    preprocessed_image: str | None = None
+    segmentation_overlay: str | None = None
+    binary_mask: str | None = None
+    isolated_harness: str | None = None
     contour_visualization: str | None = None
     skeleton_visualization: str | None = None
+    endpoints_junctions_visualization: str | None = None
+    branch_paths_visualization: str | None = None
+    feature_extraction_results: str | None = None
+
+    # Backward-compatible aliases
+    original_preprocessed: str | None = None
+    edge_map: str | None = None
     keypoint_junction_visualization: str | None = None
     combined_overlay: str | None = None
+
+
+class QualityControlSummary(BaseModel):
+    quality_status: Literal["PASS", "REVIEW", "REJECT"] = Field(
+        ..., description="Overall inspection engineering quality status"
+    )
+    segmentation_confidence: float = Field(..., description="Confidence score of harness segmentation [0.0, 1.0]")
+    image_quality_status: str = Field("PASS", description="Input image lighting and clarity status")
+    detected_components_count: int = Field(..., description="Number of valid harness components segmented")
+    endpoints_count: int = Field(..., description="Number of wire termination endpoints detected")
+    junction_candidates_count: int = Field(..., description="Number of branching junction candidates detected")
+    branches_count: int = Field(..., description="Number of distinct wire branches extracted")
+    uncertain_junctions_count: int = Field(0, description="Number of junctions flagged with ambiguous crossing")
+    extraction_warnings: list[str] = Field(default_factory=list)
+    reasons_for_review_or_reject: list[str] = Field(default_factory=list)
 
 
 class FeatureExtractionRequest(BaseModel):
@@ -148,6 +180,8 @@ class FeatureExtractionResponse(BaseModel):
     candidate_regions_for_part_id: list[CandidateRegionForPartId] = Field(default_factory=list)
     geometric_features: GeometricFeatures
     visualizations: FeatureVisualizations | None = None
+    quality_control: QualityControlSummary | None = None
+    model_status: str = "HYBRID_CV_PIPELINE"
     processing_time_ms: float
     warnings: list[str] = Field(default_factory=list)
     errors: list[str] = Field(default_factory=list)

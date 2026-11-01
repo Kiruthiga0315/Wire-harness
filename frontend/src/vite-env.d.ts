@@ -13,6 +13,7 @@ declare module 'lucide-react' {
   export type LucideIcon = ComponentType<LucideProps>
 
   export const Activity: LucideIcon
+  export const AlertTriangle: LucideIcon
   export const Beaker: LucideIcon
   export const Binary: LucideIcon
   export const Boxes: LucideIcon
@@ -24,6 +25,7 @@ declare module 'lucide-react' {
   export const CircleX: LucideIcon
   export const ClipboardCheck: LucideIcon
   export const Clock3: LucideIcon
+  export const Columns: LucideIcon
   export const Construction: LucideIcon
   export const Copy: LucideIcon
   export const Crosshair: LucideIcon
@@ -37,8 +39,10 @@ declare module 'lucide-react' {
   export const Gauge: LucideIcon
   export const GitBranch: LucideIcon
   export const History: LucideIcon
+  export const Image: LucideIcon
   export const ImagePlus: LucideIcon
   export const Info: LucideIcon
+  export const Layers: LucideIcon
   export const Menu: LucideIcon
   export const Network: LucideIcon
   export const Pencil: LucideIcon
@@ -55,11 +59,15 @@ declare module 'lucide-react' {
   export const ScanSearch: LucideIcon
   export const Search: LucideIcon
   export const Settings: LucideIcon
+  export const ShieldAlert: LucideIcon
+  export const ShieldCheck: LucideIcon
   export const SlidersHorizontal: LucideIcon
+  export const Sparkles: LucideIcon
   export const Trash2: LucideIcon
   export const TriangleAlert: LucideIcon
   export const Video: LucideIcon
   export const X: LucideIcon
+  export const XCircle: LucideIcon
   export const ZoomIn: LucideIcon
   export const ZoomOut: LucideIcon
 }

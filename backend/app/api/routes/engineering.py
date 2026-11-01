@@ -56,11 +56,24 @@ color_inspection_service = ColorInspectionService()
 harness_graph_service = HarnessGraphService()
 from app.services.wire_color_service import WireColorIdentificationService
 from app.services.feature_extraction_service import FeatureExtractionService
+import hashlib
+
 wire_color_service = WireColorIdentificationService(segmentation_service=segmentation_service)
 feature_extraction_service = FeatureExtractionService(
     segmentation_service=segmentation_service,
     graph_service=harness_graph_service,
 )
+_feature_cache: dict[str, FeatureExtractionResponse] = {}
+
+
+def clear_feature_cache() -> None:
+    _feature_cache.clear()
+
+
+def _get_feature_cache_key(image: ImageArray, req: FeatureExtractionRequest) -> str:
+    h = hashlib.sha256(image.tobytes()[:16384]).hexdigest()
+    return f"{image.shape}_{h}_{req.canny_low_threshold}_{req.canny_high_threshold}_{req.min_contour_area}"
+
 
 
 def _png_data_url(image: ImageArray) -> str:
@@ -521,11 +534,18 @@ def extract_active_image_features(
     payload: FeatureExtractionRequest | None = None,
 ) -> FeatureExtractionResponse:
     active = active_image_service.get_active_image()
+    cfg = payload or FeatureExtractionRequest()
+    cache_key = _get_feature_cache_key(active.bgr_image, cfg)
+    if cache_key in _feature_cache:
+        return _feature_cache[cache_key]
+
     try:
-        return feature_extraction_service.extract_features(
+        res = feature_extraction_service.extract_features(
             active.bgr_image,
-            config=payload or FeatureExtractionRequest(),
+            config=cfg,
         )
+        _feature_cache[cache_key] = res
+        return res
     except (ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=422, detail=f"Feature extraction failed: {exc}") from exc
 
@@ -548,11 +568,18 @@ def extract_demo_image_features(
         active = active_image_service.get_active_image()
         image = active.bgr_image
 
+    cfg = payload or FeatureExtractionRequest()
+    cache_key = _get_feature_cache_key(image, cfg)
+    if cache_key in _feature_cache:
+        return _feature_cache[cache_key]
+
     try:
-        return feature_extraction_service.extract_features(
+        res = feature_extraction_service.extract_features(
             image,
-            config=payload or FeatureExtractionRequest(),
+            config=cfg,
         )
+        _feature_cache[cache_key] = res
+        return res
     except (ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=422, detail=f"Feature extraction failed: {exc}") from exc
 

@@ -63,6 +63,7 @@ export interface JunctionCandidate {
   y: number
   branch_count: number
   is_simple_crossing: boolean
+  is_uncertain?: boolean
   branch_angles_deg: number[]
 }
 
@@ -76,6 +77,7 @@ export interface BranchFeature {
   orientation_deg: number
   mean_curvature: number
   max_bend_angle_deg: number
+  estimated_width_pixels?: number
   compact_path: number[][]
 }
 
@@ -108,16 +110,41 @@ export interface GeometricFeatures {
   max_bend_angle_deg: number
   total_detected_joints: number
   total_detected_terminals: number
+  mean_estimated_wire_width_pixels?: number
   pairwise_feature_distances: PairwiseDistance[]
 }
 
 export interface FeatureVisualizations {
-  original_preprocessed?: string | null
-  edge_map?: string | null
+  // 10 Diagnostic Engineering Views
+  original_image?: string | null
+  preprocessed_image?: string | null
+  segmentation_overlay?: string | null
+  binary_mask?: string | null
+  isolated_harness?: string | null
   contour_visualization?: string | null
   skeleton_visualization?: string | null
+  endpoints_junctions_visualization?: string | null
+  branch_paths_visualization?: string | null
+  feature_extraction_results?: string | null
+
+  // Backward compatibility
+  original_preprocessed?: string | null
+  edge_map?: string | null
   keypoint_junction_visualization?: string | null
   combined_overlay?: string | null
+}
+
+export interface QualityControlSummary {
+  quality_status: 'PASS' | 'REVIEW' | 'REJECT'
+  segmentation_confidence: number
+  image_quality_status: string
+  detected_components_count: number
+  endpoints_count: number
+  junction_candidates_count: number
+  branches_count: number
+  uncertain_junctions_count: number
+  extraction_warnings: string[]
+  reasons_for_review_or_reject: string[]
 }
 
 export interface FeatureExtractionResponse {
@@ -128,6 +155,8 @@ export interface FeatureExtractionResponse {
   candidate_regions_for_part_id: CandidateRegionForPartId[]
   geometric_features: GeometricFeatures
   visualizations?: FeatureVisualizations | null
+  quality_control?: QualityControlSummary | null
+  model_status?: string
   processing_time_ms: number
   warnings: string[]
   errors: string[]
